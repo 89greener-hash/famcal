@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리 가족 일정</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1c1e21;--sub:#6b7280;--line:#e5e7eb;--accent:#3b82f6;--accent-bg:#e8f0fe;--danger:#ef4444;--today:#fde68a}
+@media (prefers-color-scheme:dark){:root{--bg:#15171a;--card:#202327;--text:#e8eaed;--sub:#9aa0a6;--line:#33373d;--accent:#6ea8fe;--accent-bg:#27324a;--danger:#f87171;--today:#5b4a12}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Malgun Gothic",system-ui,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:16px}
+.top{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+.tabs{display:flex;gap:8px;flex:1}
+.tabs button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+input,textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+input[type=color]{padding:2px;height:38px;width:48px}
+input[type=checkbox]{width:auto}
+textarea{min-height:140px;resize:vertical}
+button.pri{white-space:nowrap;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;cursor:pointer}
+button.ghost{background:none;border:0;color:var(--sub);cursor:pointer;font:inherit;padding:4px 8px}
+button.ghost:hover{color:var(--text)}
+.row{display:flex;gap:8px;align-items:center}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.nav b{font-size:18px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:2px solid;border-radius:20px;padding:2px 12px;font:inherit;font-size:14px;cursor:pointer;background:none;color:var(--text)}
+.chip.on{color:#fff}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.dow{color:var(--sub);font-size:13px;padding:4px 0}
+.day{aspect-ratio:1;border-radius:8px;border:1px solid transparent;background:none;color:var(--text);font:inherit;cursor:pointer;position:relative}
+.day:hover{background:var(--accent-bg)}
+.day.today{background:var(--today)}
+.day.sel{border-color:var(--accent);background:var(--accent-bg)}
+.day.sun{color:var(--danger)}
+.dots{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:2px}
+.dots i{width:6px;height:6px;border-radius:50%}
+.item{display:flex;gap:10px;align-items:center;padding:8px 0 8px 10px;border-bottom:1px solid var(--line);border-left:4px solid;margin-bottom:4px;border-radius:2px}
+.item .t{color:var(--sub);font-size:14px;min-width:48px}
+.item .x{flex:1}
+.item small{color:var(--sub)}
+.item.done .x{text-decoration:line-through;color:var(--sub)}
+.memo{cursor:pointer;border-left:6px solid}
+.memo h3{margin:0 0 4px;font-size:16px}
+.memo p{margin:0;color:var(--sub);white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.memo small{color:var(--sub)}
+.empty{color:var(--sub);text-align:center;padding:20px 0}
+dialog{width:min(560px,92vw);border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);padding:16px}
+dialog::backdrop{background:#0006}
+label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
+.status{font-size:12px;color:var(--sub);white-space:nowrap}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="tabs">
+      <button id="tabS" class="on">📅 일정</button>
+      <button id="tabM">📝 메모</button>
+    </div>
+    <span class="status" id="status"></span>
+    <button class="ghost" id="gear" title="설정">⚙️</button>
+  </div>
+
+  <section id="vS">
+    <div class="card">
+      <div class="chips" id="chips"></div>
+      <div class="nav">
+        <button class="ghost" id="prev">◀</button>
+        <b id="title"></b>
+        <button class="ghost" id="next">▶</button>
+      </div>
+      <div class="grid" id="cal"></div>
+    </div>
+    <div class="card">
+      <b id="selLabel"></b>
+      <form id="evForm" style="margin:10px 0">
+        <div class="row" style="margin-bottom:8px">
+          <select id="evOwner" style="width:130px"></select>
+          <input type="time" id="evTime" style="width:130px">
+        </div>
+        <div class="row">
+          <input id="evText" placeholder="일정 입력" required>
+          <button class="pri">추가</button>
+        </div>
+      </form>
+      <div id="evList"></div>
+    </div>
+  </section>
+
+  <section id="vM" hidden>
+    <div class="row" style="margin-bottom:12px">
+      <input id="q" placeholder="메모 검색">
+      <button class="pri" id="newMemo">+ 새 메모</button>
+    </div>
+    <div id="memoList"></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <select id="mOwner" style="margin-bottom:8px"></select>
+  <input id="mTitle" placeholder="제목" style="margin-bottom:8px">
+  <textarea id="mBody" placeholder="내용"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button class="ghost" id="mPin"></button>
+    <button class="ghost" id="mDel" style="color:var(--danger)">삭제</button>
+    <span style="flex:1"></span>
+    <button class="ghost" id="mCancel">닫기</button>
+    <button class="pri" id="mSave">저장</button>
+  </div>
+</dialog>
+
+<dialog id="set">
+  <b>설정</b>
+  <label>이 폰의 주인</label>
+  <select id="sMe"></select>
+  <label>사람 이름 / 색상</label>
+  <div id="sPeople"></div>
+  <label>공유 서버 주소 (Firebase Realtime Database URL)</label>
+  <input id="sUrl" placeholder="https://xxxx-default-rtdb.firebaseio.com">
+  <label>가족 코드 (두 폰에 똑같이 입력, 남에게 알려주지 마세요)</label>
+  <input id="sCode" placeholder="예: 우리집-7391">
+  <div class="row" style="margin-top:14px">
+    <button class="ghost" id="exp">백업 저장</button>
+    <button class="ghost" id="imp">백업 불러오기</button>
+    <input type="file" id="file" accept=".json" hidden>
+    <span style="flex:1"></span>
+    <button class="pri" id="sSave">저장</button>
+  </div>
+</dialog>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+const DEFAULT_PEOPLE=[{id:'a',name:'나',color:'#3b82f6'},{id:'b',name:'배우자',color:'#ec4899'},{id:'c',name:'아이',color:'#f59e0b'}];
+let db=Object.assign({people:DEFAULT_PEOPLE,events:{},memos:{}},ls.get('fam-db',{}));
+let cfg=Object.assign({url:'',code:'',me:'a'},ls.get('fam-cfg',{}));
+let hidden=new Set(ls.get('fam-hidden',[]));
+let view=new Date(); view.setDate(1);
+let sel=key(new Date());
+let editing=null, inflight=0;
+
+const person=id=>db.people.find(p=>p.id===id)||db.people[0];
+const arr=o=>Object.values(o||{});
+
+/* ---------- 저장 / 동기화 ---------- */
+const base=()=>cfg.url&&cfg.code?`${cfg.url.replace(/\/+$/,'')}/rooms/${encodeURIComponent(cfg.code)}`:'';
+const saveLocal=()=>ls.set('fam-db',db);
+async function push(path,val){
+  saveLocal();
+  if(!base())return;
+  inflight++;
+  try{await fetch(`${base()}/${path}.json`,{method:val===null?'DELETE':'PUT',body:JSON.stringify(val)});setStatus('ok')}
+  catch(e){setStatus('err')}
+  finally{inflight--}
+}
+async function pull(){
+  if(!base()||inflight)return;
+  try{
+    const r=await fetch(`${base()}.json`);
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    if(d===null){await fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)})}
+    else{db={people:d.people||db.people,events:d.events||{},memos:d.memos||{}};saveLocal()}
+    setStatus('ok');renderAll();
+  }catch(e){setStatus('err')}
+}
+function setStatus(s){
+  $('status').textContent=!base()?'● 이 폰에만 저장':s==='err'?'● 연결 안 됨':'● 공유 중';
+  $('status').style.color=!base()?'':s==='err'?'#ef4444':'#22c55e';
+}
+setInterval(pull,5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
+
+/* ---------- 공통 UI ---------- */
+function fillOwner(sel,val){
+  sel.innerHTML=db.people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  sel.value=val;
+}
+function tab(s){$('vS').hidden=!s;$('vM').hidden=s;$('tabS').classList.toggle('on',s);$('tabM').classList.toggle('on',!s);}
+$('tabS').onclick=()=>tab(true); $('tabM').onclick=()=>{tab(false);renderMemos()};
+
+function renderChips(){
+  $('chips').innerHTML=db.people.map(p=>{
+    const on=!hidden.has(p.id);
+    return `<button class="chip${on?' on':''}" data-p="${p.id}" style="border-color:${p.color};${on?`background:${p.color}`:''}">${esc(p.name)}</button>`;
+  }).join('');
+  $('chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    hidden.has(b.dataset.p)?hidden.delete(b.dataset.p):hidden.add(b.dataset.p);
+    ls.set('fam-hidden',[...hidden]);renderAll();
+  });
+}
+
+/* ---------- 달력 / 일정 ---------- */
+function renderCal(){
+  const y=view.getFullYear(),m=view.getMonth();
+  $('title').textContent=`${y}년 ${m+1}월`;
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), today=key(new Date());
+  const byDate={};
+  arr(db.events).filter(e=>!hidden.has(e.owner)).forEach(e=>(byDate[e.date]=byDate[e.date]||[]).push(e));
+  let h=['일','월','화','수','목','금','토'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<first;i++)h+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const k=`${y}-${pad(m+1)}-${pad(d)}`, dow=(first+d-1)%7;
+    const owners=[...new Set((byDate[k]||[]).map(e=>e.owner))].slice(0,4);
+    h+=`<button class="day${k===today?' today':''}${k===sel?' sel':''}${dow===0?' sun':''}" data-k="${k}">${d}<span class="dots">${owners.map(o=>`<i style="background:${person(o).color}"></i>`).join('')}</span></button>`;
+  }
+  $('cal').innerHTML=h;
+  $('cal').querySelectorAll('.day').forEach(b=>b.onclick=()=>{sel=b.dataset.k;renderCal();renderEv()});
+}
+function renderEv(){
+  const [,m,d]=sel.split('-');
+  $('selLabel').textContent=`${+m}월 ${+d}일 일정`;
+  const list=arr(db.events).filter(e=>e.date===sel&&!hidden.has(e.owner)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
+  $('evList').innerHTML=list.length?list.map(e=>`
+    <div class="item${e.done?' done':''}" style="border-left-color:${person(e.owner).color}">
+      <input type="checkbox" data-c="${e.id}" ${e.done?'checked':''}>
+      <span class="t">${e.time||'종일'}</span>
+      <span class="x">${esc(e.text)} <small>· ${esc(person(e.owner).name)}</small></span>
+      <button class="ghost" data-d="${e.id}">✕</button>
+    </div>`).join(''):'<div class="empty">일정이 없어요</div>';
+  $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{const e=db.events[c.dataset.c];e.done=c.checked;push(`events/${e.id}`,e);renderEv()});
+  $('evList').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{delete db.events[b.dataset.d];push(`events/${b.dataset.d}`,null);renderCal();renderEv()});
+}
+$('prev').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
+$('next').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
+$('evForm').onsubmit=e=>{
+  e.preventDefault();
+  const ev={id:uid(),date:sel,time:$('evTime').value,text:$('evText').value.trim(),owner:$('evOwner').value,done:false};
+  db.events[ev.id]=ev;push(`events/${ev.id}`,ev);
+  $('evText').value='';$('evTime').value='';renderCal();renderEv();
+};
+
+/* ---------- 메모 ---------- */
+function renderMemos(){
+  const q=$('q').value.trim().toLowerCase();
+  const list=arr(db.memos).filter(m=>(m.title+m.body).toLowerCase().includes(q))
+    .sort((a,b)=>(!!b.pinned-!!a.pinned)||b.updated-a.updated);
+  $('memoList').innerHTML=list.length?list.map(m=>`
+    <div class="card memo" data-id="${m.id}" style="border-left-color:${person(m.owner).color}">
+      <h3>${m.pinned?'📌 ':''}${esc(m.title||'제목 없음')}</h3>
+      <p>${esc(m.body)}</p>
+      <small>${esc(person(m.owner).name)} · ${new Date(m.updated).toLocaleString('ko-KR')}</small>
+    </div>`).join(''):'<div class="empty">메모가 없어요</div>';
+  $('memoList').querySelectorAll('.memo').forEach(c=>c.onclick=()=>openMemo(c.dataset.id));
+}
+function openMemo(id){
+  editing=id?{...db.memos[id]}:{id:uid(),title:'',body:'',pinned:false,owner:cfg.me,isNew:true};
+  fillOwner($('mOwner'),editing.owner);
+  $('mTitle').value=editing.title;$('mBody').value=editing.body;
+  $('mPin').textContent=editing.pinned?'📌 고정 해제':'📌 고정';
+  $('mDel').hidden=!!editing.isNew;
+  $('dlg').showModal();
+}
+$('newMemo').onclick=()=>openMemo();
+$('q').oninput=renderMemos;
+$('mPin').onclick=()=>{editing.pinned=!editing.pinned;$('mPin').textContent=editing.pinned?'📌 고정 해제':'📌 고정'};
+$('mCancel').onclick=()=>$('dlg').close();
+$('mSave').onclick=()=>{
+  editing.title=$('mTitle').value.trim();editing.body=$('mBody').value;editing.owner=$('mOwner').value;editing.updated=Date.now();
+  const isNew=editing.isNew;delete editing.isNew;
+  if(!isNew||editing.title||editing.body){db.memos[editing.id]=editing;push(`memos/${editing.id}`,editing)}
+  $('dlg').close();renderMemos();
+};
+$('mDel').onclick=()=>{if(confirm('이 메모를 삭제할까요? (공유된 메모는 상대방 폰에서도 사라져요)')){delete db.memos[editing.id];push(`memos/${editing.id}`,null);$('dlg').close();renderMemos()}};
+
+/* ---------- 설정 ---------- */
+$('gear').onclick=()=>{
+  fillOwner($('sMe'),cfg.me);
+  $('sPeople').innerHTML=db.people.map(p=>`<div class="row" style="margin-bottom:6px"><input data-n="${p.id}" value="${esc(p.name)}"><input type="color" data-k="${p.id}" value="${p.color}"></div>`).join('');
+  $('sUrl').value=cfg.url;$('sCode').value=cfg.code;
+  $('set').showModal();
+};
+$('sSave').onclick=()=>{
+  db.people.forEach(p=>{p.name=document.querySelector(`[data-n="${p.id}"]`).value.trim()||p.name;p.color=document.querySelector(`[data-k="${p.id}"]`).value});
+  cfg={url:$('sUrl').value.trim(),code:$('sCode').value.trim(),me:$('sMe').value};
+  ls.set('fam-cfg',cfg);saveLocal();
+  if(base())push('people',db.people);
+  $('set').close();setStatus('ok');renderAll();pull();
+};
+$('exp').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
+  a.download=`가족일정_${key(new Date())}.json`;a.click();
+};
+$('imp').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  try{
+    const d=JSON.parse(await e.target.files[0].text());
+    if(!d.events||!d.memos||!Array.isArray(d.people))throw 0;
+    if(confirm('현재 데이터를 백업 파일 내용으로 바꿀까요?')){db=d;saveLocal();if(base())fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)});renderAll()}
+  }catch(_){alert('올바른 백업 파일이 아니에요')}
+  e.target.value='';
+};
+
+function renderAll(){renderChips();fillOwner($('evOwner'),$('evOwner').value||cfg.me);renderCal();renderEv();renderMemos()}
+setStatus('ok');renderAll();pull();
+</script>
+</body>
+</html>
