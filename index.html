@@ -40,7 +40,11 @@ button.ghost:hover{color:var(--text)}
 .day.sun{color:var(--danger)}
 .dots{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:2px}
 .dots i{width:6px;height:6px;border-radius:50%}
-.item{display:flex;gap:10px;align-items:center;padding:8px 0 8px 10px;border-bottom:1px solid var(--line);border-left:4px solid;margin-bottom:4px;border-radius:2px}
+.item{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:4px}
+.item .bar{width:4px;align-self:stretch;border-radius:2px;flex:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:2px solid;border-radius:20px;padding:4px 16px;font:inherit;cursor:pointer;background:none;color:var(--text)}
+.chip.on{color:#fff}
 .item .t{color:var(--sub);font-size:14px;min-width:48px}
 .item .x{flex:1;cursor:pointer}
 .item small{color:var(--sub)}
@@ -97,8 +101,8 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
 
 <dialog id="evDlg">
   <b id="evTitle">일정</b>
-  <label>누구 일정</label>
-  <select id="eOwner"></select>
+  <label>누구 일정 (여러 명 선택 가능)</label>
+  <div class="chips" id="eOwners"></div>
   <label>내용</label>
   <input id="eText" placeholder="일정 내용">
   <label>날짜 (기간이면 시작 ~ 끝)</label>
@@ -201,6 +205,8 @@ function occurs(ev,d){
   }
   return false;
 }
+const ownersOf=e=>e.owners&&e.owners.length?e.owners:[e.owner];
+const barOf=e=>{const c=ownersOf(e).map(o=>person(o).color);return c.length>1?`linear-gradient(${c.map((x,i)=>`${x} ${i*100/c.length}% ${(i+1)*100/c.length}%`).join(',')})`:c[0]};
 const isDone=(ev,d)=>ev.repeat?!!(ev.doneOn&&ev.doneOn[d]):!!ev.done;
 const eventsOn=d=>arr(db.events).filter(e=>occurs(e,d)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
 const REP={daily:'매일',weekly:'매주',monthly:'매월',yearly:'매년'};
@@ -252,7 +258,7 @@ function renderCal(){
   for(let i=0;i<first;i++)h+='<div></div>';
   for(let d=1;d<=days;d++){
     const k=`${y}-${pad(m+1)}-${pad(d)}`, dow=(first+d-1)%7;
-    const owners=[...new Set(eventsOn(k).map(e=>e.owner))].slice(0,4);
+    const owners=[...new Set(eventsOn(k).flatMap(ownersOf))].slice(0,4);
     h+=`<button class="day${k===today?' today':''}${k===sel?' sel':''}${dow===0?' sun':''}" data-k="${k}">${d}<span class="dots">${owners.map(o=>`<i style="background:${person(o).color}"></i>`).join('')}</span></button>`;
   }
   $('cal').innerHTML=h;
@@ -266,10 +272,11 @@ function renderEv(){
     const range=e.end&&e.end>e.date?` · ${md(e.date)}~${md(e.end)}`:'';
     const rep=e.repeat?` · 🔁${REP[e.repeat]}`:'';
     return `
-    <div class="item${isDone(e,sel)?' done':''}" style="border-left-color:${person(e.owner).color}">
+    <div class="item${isDone(e,sel)?' done':''}">
+      <i class="bar" style="background:${barOf(e)}"></i>
       <input type="checkbox" data-c="${e.id}" ${isDone(e,sel)?'checked':''}>
       <span class="t">${e.time||'종일'}</span>
-      <span class="x" data-e="${e.id}">${esc(e.text)} <small>· ${esc(person(e.owner).name)}${range}${rep}</small></span>
+      <span class="x" data-e="${e.id}">${esc(e.text)} <small>· ${ownersOf(e).map(o=>esc(person(o).name)).join('·')}${range}${rep}</small></span>
     </div>`}).join(''):'<div class="empty">일정이 없어요</div>';
   $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{
     const e=db.events[c.dataset.c];
@@ -287,12 +294,26 @@ $('eH').innerHTML='<option value="">종일</option>'+Array.from({length:24},(_,i
 $('eM').innerHTML=Array.from({length:12},(_,i)=>`<option value="${pad(i*5)}">${pad(i*5)}</option>`).join('');
 $('eRep').onchange=()=>{$('eUntilBox').hidden=!$('eRep').value};
 
+let evOwners=new Set();
+function renderOwnerChips(){
+  $('eOwners').innerHTML=db.people.map(p=>{
+    const on=evOwners.has(p.id);
+    return `<button type="button" class="chip${on?' on':''}" data-p="${p.id}" style="border-color:${p.color};${on?`background:${p.color}`:''}">${esc(p.name)}</button>`;
+  }).join('');
+  $('eOwners').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.p;
+    if(evOwners.has(id)){if(evOwners.size>1)evOwners.delete(id)} // 최소 1명은 선택
+    else evOwners.add(id);
+    renderOwnerChips();
+  });
+}
 function openEv(ev,draft){
   const src=draft||ev;
   editingEv=ev&&!draft?ev:{id:uid()};
   const isNew=!ev||!!draft;
   $('evTitle').textContent=draft?'일정 복제':isNew?'일정 추가':'일정 수정';
-  fillOwner($('eOwner'),src?src.owner:cfg.me);
+  evOwners=new Set(src?ownersOf(src):[cfg.me]);
+  renderOwnerChips();
   $('eText').value=src?src.text:'';
   $('eStart').value=src?src.date:sel;
   $('eEnd').value=src&&src.end&&src.end>src.date?src.end:'';
@@ -314,7 +335,7 @@ $('eSave').onclick=()=>{
   if(!start){alert('날짜를 골라 주세요');return}
   let end=$('eEnd').value;if(end&&end<=start)end='';
   const ev=Object.assign(editingEv,{
-    owner:$('eOwner').value,text,date:start,end,
+    owner:[...evOwners][0],owners:[...evOwners],text,date:start,end,
     time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',
     repeat:$('eRep').value,until:$('eRep').value?$('eUntil').value:''
   });
@@ -339,7 +360,7 @@ $('eCopy').onclick=async()=>{
 };
 $('eDup').onclick=()=>{
   $('evDlg').close();
-  openEv(editingEv,{owner:$('eOwner').value,text:$('eText').value,date:$('eStart').value,end:$('eEnd').value,
+  openEv(editingEv,{owners:[...evOwners],text:$('eText').value,date:$('eStart').value,end:$('eEnd').value,
     time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value});
 };
 
@@ -408,6 +429,15 @@ $('file').onchange=async e=>{
 };
 
 function renderAll(){renderCal();renderEv();renderMemos()}
+// 설치 도우미 링크(#s=서버&c=코드&me=주인)로 열면 설정을 자동 입력하고 주소에서 지운다
+(function(){
+  const h=location.hash.slice(1);
+  if(!h.startsWith('s='))return;
+  const q=new URLSearchParams(h);
+  cfg={url:q.get('s')||'',code:q.get('c')||'',me:q.get('me')||cfg.me};
+  ls.set('fam-cfg',cfg);
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+})();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setStatus('ok');renderAll();pull();
 </script>
