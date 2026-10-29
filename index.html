@@ -21,19 +21,16 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Malgun Gothi
 .tabs button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;font:inherit;cursor:pointer}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-input,textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+input,textarea,select{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
 input[type=color]{padding:2px;height:38px;width:48px}
 input[type=checkbox]{width:auto}
 textarea{min-height:140px;resize:vertical}
 button.pri{white-space:nowrap;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;cursor:pointer}
-button.ghost{background:none;border:0;color:var(--sub);cursor:pointer;font:inherit;padding:4px 8px}
+button.ghost{background:none;border:0;color:var(--sub);cursor:pointer;font:inherit;padding:4px 8px;white-space:nowrap}
 button.ghost:hover{color:var(--text)}
 .row{display:flex;gap:8px;align-items:center}
 .nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .nav b{font-size:18px}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.chip{border:2px solid;border-radius:20px;padding:2px 12px;font:inherit;font-size:14px;cursor:pointer;background:none;color:var(--text)}
-.chip.on{color:#fff}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
 .dow{color:var(--sub);font-size:13px;padding:4px 0}
 .day{aspect-ratio:1;border-radius:8px;border:1px solid transparent;background:none;color:var(--text);font:inherit;cursor:pointer;position:relative}
@@ -45,7 +42,7 @@ button.ghost:hover{color:var(--text)}
 .dots i{width:6px;height:6px;border-radius:50%}
 .item{display:flex;gap:10px;align-items:center;padding:8px 0 8px 10px;border-bottom:1px solid var(--line);border-left:4px solid;margin-bottom:4px;border-radius:2px}
 .item .t{color:var(--sub);font-size:14px;min-width:48px}
-.item .x{flex:1}
+.item .x{flex:1;cursor:pointer}
 .item small{color:var(--sub)}
 .item.done .x{text-decoration:line-through;color:var(--sub)}
 .memo{cursor:pointer;border-left:6px solid}
@@ -73,7 +70,6 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
 
   <section id="vS">
     <div class="card">
-      <div class="chips" id="chips"></div>
       <div class="nav">
         <button class="ghost" id="prev">◀</button>
         <b id="title"></b>
@@ -82,17 +78,10 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
       <div class="grid" id="cal"></div>
     </div>
     <div class="card">
-      <b id="selLabel"></b>
-      <form id="evForm" style="margin:10px 0">
-        <div class="row" style="margin-bottom:8px">
-          <select id="evOwner" style="width:130px"></select>
-          <input type="time" id="evTime" style="width:130px">
-        </div>
-        <div class="row">
-          <input id="evText" placeholder="일정 입력" required>
-          <button class="pri">추가</button>
-        </div>
-      </form>
+      <div class="row" style="margin-bottom:10px">
+        <b id="selLabel" style="flex:1"></b>
+        <button class="pri" id="newEv">+ 일정 추가</button>
+      </div>
       <div id="evList"></div>
     </div>
   </section>
@@ -105,6 +94,38 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
     <div id="memoList"></div>
   </section>
 </div>
+
+<dialog id="evDlg">
+  <b id="evTitle">일정</b>
+  <label>누구 일정</label>
+  <select id="eOwner"></select>
+  <label>내용</label>
+  <input id="eText" placeholder="일정 내용">
+  <label>날짜 (기간이면 시작 ~ 끝)</label>
+  <div class="row"><input type="date" id="eStart"><span>~</span><input type="date" id="eEnd"></div>
+  <label>시간 (시를 "종일"로 두면 시간 없음)</label>
+  <div class="row"><select id="eH"></select><span>시</span><select id="eM"></select><span>분</span></div>
+  <label>반복</label>
+  <select id="eRep">
+    <option value="">반복 안 함</option>
+    <option value="daily">매일</option>
+    <option value="weekly">매주</option>
+    <option value="monthly">매월</option>
+    <option value="yearly">매년</option>
+  </select>
+  <div id="eUntilBox" hidden>
+    <label>반복 끝나는 날 (비워두면 계속 반복)</label>
+    <input type="date" id="eUntil">
+  </div>
+  <div class="row" style="margin-top:14px;flex-wrap:wrap">
+    <button class="ghost" id="eDel" style="color:var(--danger)">삭제</button>
+    <button class="ghost" id="eCopy">📋 복사</button>
+    <button class="ghost" id="eDup">복제</button>
+    <span style="flex:1"></span>
+    <button class="ghost" id="eCancel">닫기</button>
+    <button class="pri" id="eSave">저장</button>
+  </div>
+</dialog>
 
 <dialog id="dlg">
   <select id="mOwner" style="margin-bottom:8px"></select>
@@ -126,9 +147,9 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
   <label>사람 이름 / 색상</label>
   <div id="sPeople"></div>
   <label>공유 서버 주소 (Firebase Realtime Database URL)</label>
-  <input id="sUrl" placeholder="https://xxxx-default-rtdb.firebaseio.com">
+  <input id="sUrl" placeholder="https://xxxx-default-rtdb.firebaseio.com" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" inputmode="url">
   <label>가족 코드 (두 폰에 똑같이 입력, 남에게 알려주지 마세요)</label>
-  <input id="sCode" placeholder="예: 우리집-7391">
+  <input id="sCode" placeholder="예: 우리집-7391" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false">
   <div class="row" style="margin-top:14px">
     <button class="ghost" id="exp">백업 저장</button>
     <button class="ghost" id="imp">백업 불러오기</button>
@@ -146,16 +167,44 @@ const key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
-const DEFAULT_PEOPLE=[{id:'a',name:'나',color:'#3b82f6'},{id:'b',name:'배우자',color:'#ec4899'},{id:'c',name:'아이',color:'#f59e0b'}];
+const DEFAULT_PEOPLE=[{id:'a',name:'아빠',color:'#3b82f6'},{id:'b',name:'엄마',color:'#ec4899'},{id:'c',name:'아이',color:'#f59e0b'}];
 let db=Object.assign({people:DEFAULT_PEOPLE,events:{},memos:{}},ls.get('fam-db',{}));
 let cfg=Object.assign({url:'',code:'',me:'a'},ls.get('fam-cfg',{}));
-let hidden=new Set(ls.get('fam-hidden',[]));
 let view=new Date(); view.setDate(1);
 let sel=key(new Date());
-let editing=null, inflight=0;
+let editing=null, editingEv=null, inflight=0;
 
 const person=id=>db.people.find(p=>p.id===id)||db.people[0];
 const arr=o=>Object.values(o||{});
+
+/* ---------- 날짜 계산 / 반복 ---------- */
+const dn=s=>{const[y,m,d]=s.split('-');return Date.UTC(+y,m-1,+d)/864e5};
+const ds=n=>{const t=new Date(n*864e5);return `${t.getUTCFullYear()}-${pad(t.getUTCMonth()+1)}-${pad(t.getUTCDate())}`};
+const dayOf=s=>+s.split('-')[2], monOf=s=>+s.split('-')[1];
+
+// ev가 날짜 d(YYYY-MM-DD)에 걸쳐 있는지
+function occurs(ev,d){
+  if(!ev.date)return false;
+  const s=ev.date,e=ev.end&&ev.end>=s?ev.end:s,D=dn(d),S=dn(s);
+  if(!ev.repeat)return D>=S&&D<=dn(e);
+  const span=dn(e)-S;
+  for(let o=0;o<=span;o++){
+    const c=D-o;
+    if(c<S)break;
+    const cs=ds(c);
+    if(ev.until&&cs>ev.until)continue;
+    const ok=ev.repeat==='daily'
+      ||(ev.repeat==='weekly'&&(c-S)%7===0)
+      ||(ev.repeat==='monthly'&&dayOf(cs)===dayOf(s))
+      ||(ev.repeat==='yearly'&&dayOf(cs)===dayOf(s)&&monOf(cs)===monOf(s));
+    if(ok)return true;
+  }
+  return false;
+}
+const isDone=(ev,d)=>ev.repeat?!!(ev.doneOn&&ev.doneOn[d]):!!ev.done;
+const eventsOn=d=>arr(db.events).filter(e=>occurs(e,d)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
+const REP={daily:'매일',weekly:'매주',monthly:'매월',yearly:'매년'};
+const md=s=>`${monOf(s)}/${dayOf(s)}`;
 
 /* ---------- 저장 / 동기화 ---------- */
 const base=()=>cfg.url&&cfg.code?`${cfg.url.replace(/\/+$/,'')}/rooms/${encodeURIComponent(cfg.code)}`:'';
@@ -194,29 +243,16 @@ function fillOwner(sel,val){
 function tab(s){$('vS').hidden=!s;$('vM').hidden=s;$('tabS').classList.toggle('on',s);$('tabM').classList.toggle('on',!s);}
 $('tabS').onclick=()=>tab(true); $('tabM').onclick=()=>{tab(false);renderMemos()};
 
-function renderChips(){
-  $('chips').innerHTML=db.people.map(p=>{
-    const on=!hidden.has(p.id);
-    return `<button class="chip${on?' on':''}" data-p="${p.id}" style="border-color:${p.color};${on?`background:${p.color}`:''}">${esc(p.name)}</button>`;
-  }).join('');
-  $('chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
-    hidden.has(b.dataset.p)?hidden.delete(b.dataset.p):hidden.add(b.dataset.p);
-    ls.set('fam-hidden',[...hidden]);renderAll();
-  });
-}
-
 /* ---------- 달력 / 일정 ---------- */
 function renderCal(){
   const y=view.getFullYear(),m=view.getMonth();
   $('title').textContent=`${y}년 ${m+1}월`;
   const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), today=key(new Date());
-  const byDate={};
-  arr(db.events).filter(e=>!hidden.has(e.owner)).forEach(e=>(byDate[e.date]=byDate[e.date]||[]).push(e));
   let h=['일','월','화','수','목','금','토'].map(d=>`<div class="dow">${d}</div>`).join('');
   for(let i=0;i<first;i++)h+='<div></div>';
   for(let d=1;d<=days;d++){
     const k=`${y}-${pad(m+1)}-${pad(d)}`, dow=(first+d-1)%7;
-    const owners=[...new Set((byDate[k]||[]).map(e=>e.owner))].slice(0,4);
+    const owners=[...new Set(eventsOn(k).map(e=>e.owner))].slice(0,4);
     h+=`<button class="day${k===today?' today':''}${k===sel?' sel':''}${dow===0?' sun':''}" data-k="${k}">${d}<span class="dots">${owners.map(o=>`<i style="background:${person(o).color}"></i>`).join('')}</span></button>`;
   }
   $('cal').innerHTML=h;
@@ -225,24 +261,86 @@ function renderCal(){
 function renderEv(){
   const [,m,d]=sel.split('-');
   $('selLabel').textContent=`${+m}월 ${+d}일 일정`;
-  const list=arr(db.events).filter(e=>e.date===sel&&!hidden.has(e.owner)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
-  $('evList').innerHTML=list.length?list.map(e=>`
-    <div class="item${e.done?' done':''}" style="border-left-color:${person(e.owner).color}">
-      <input type="checkbox" data-c="${e.id}" ${e.done?'checked':''}>
+  const list=eventsOn(sel);
+  $('evList').innerHTML=list.length?list.map(e=>{
+    const range=e.end&&e.end>e.date?` · ${md(e.date)}~${md(e.end)}`:'';
+    const rep=e.repeat?` · 🔁${REP[e.repeat]}`:'';
+    return `
+    <div class="item${isDone(e,sel)?' done':''}" style="border-left-color:${person(e.owner).color}">
+      <input type="checkbox" data-c="${e.id}" ${isDone(e,sel)?'checked':''}>
       <span class="t">${e.time||'종일'}</span>
-      <span class="x">${esc(e.text)} <small>· ${esc(person(e.owner).name)}</small></span>
-      <button class="ghost" data-d="${e.id}">✕</button>
-    </div>`).join(''):'<div class="empty">일정이 없어요</div>';
-  $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{const e=db.events[c.dataset.c];e.done=c.checked;push(`events/${e.id}`,e);renderEv()});
-  $('evList').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{delete db.events[b.dataset.d];push(`events/${b.dataset.d}`,null);renderCal();renderEv()});
+      <span class="x" data-e="${e.id}">${esc(e.text)} <small>· ${esc(person(e.owner).name)}${range}${rep}</small></span>
+    </div>`}).join(''):'<div class="empty">일정이 없어요</div>';
+  $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{
+    const e=db.events[c.dataset.c];
+    if(e.repeat){e.doneOn=e.doneOn||{};c.checked?e.doneOn[sel]=true:delete e.doneOn[sel]}
+    else e.done=c.checked;
+    push(`events/${e.id}`,e);renderEv();
+  });
+  $('evList').querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>openEv(db.events[x.dataset.e]));
 }
 $('prev').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
 $('next').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
-$('evForm').onsubmit=e=>{
-  e.preventDefault();
-  const ev={id:uid(),date:sel,time:$('evTime').value,text:$('evText').value.trim(),owner:$('evOwner').value,done:false};
+
+/* ---------- 일정 입력창 ---------- */
+$('eH').innerHTML='<option value="">종일</option>'+Array.from({length:24},(_,i)=>`<option value="${pad(i)}">${pad(i)}</option>`).join('');
+$('eM').innerHTML=Array.from({length:12},(_,i)=>`<option value="${pad(i*5)}">${pad(i*5)}</option>`).join('');
+$('eRep').onchange=()=>{$('eUntilBox').hidden=!$('eRep').value};
+
+function openEv(ev,draft){
+  const src=draft||ev;
+  editingEv=ev&&!draft?ev:{id:uid()};
+  const isNew=!ev||!!draft;
+  $('evTitle').textContent=draft?'일정 복제':isNew?'일정 추가':'일정 수정';
+  fillOwner($('eOwner'),src?src.owner:cfg.me);
+  $('eText').value=src?src.text:'';
+  $('eStart').value=src?src.date:sel;
+  $('eEnd').value=src&&src.end&&src.end>src.date?src.end:'';
+  const [h,mi]=(src&&src.time?src.time:':').split(':');
+  $('eH').value=h||'';
+  $('eM').value=h?String(Math.round((+mi||0)/5)*5%60).padStart(2,'0'):'00';
+  $('eRep').value=src&&src.repeat||'';
+  $('eUntil').value=src&&src.until||'';
+  $('eUntilBox').hidden=!$('eRep').value;
+  $('eDel').hidden=isNew;$('eDup').hidden=isNew;
+  $('eCopy').textContent='📋 복사';
+  $('evDlg').showModal();
+}
+$('newEv').onclick=()=>openEv(null);
+$('eCancel').onclick=()=>$('evDlg').close();
+$('eSave').onclick=()=>{
+  const text=$('eText').value.trim(), start=$('eStart').value;
+  if(!text){alert('일정 내용을 입력해 주세요');return}
+  if(!start){alert('날짜를 골라 주세요');return}
+  let end=$('eEnd').value;if(end&&end<=start)end='';
+  const ev=Object.assign(editingEv,{
+    owner:$('eOwner').value,text,date:start,end,
+    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',
+    repeat:$('eRep').value,until:$('eRep').value?$('eUntil').value:''
+  });
+  if(!ev.repeat)delete ev.doneOn;
   db.events[ev.id]=ev;push(`events/${ev.id}`,ev);
-  $('evText').value='';$('evTime').value='';renderCal();renderEv();
+  sel=start;view=new Date(start.slice(0,7)+'-01T00:00');
+  $('evDlg').close();renderCal();renderEv();
+};
+$('eDel').onclick=()=>{
+  const msg=editingEv.repeat?'반복 일정 전체가 삭제돼요. 삭제할까요?':'이 일정을 삭제할까요?';
+  if(confirm(msg)){delete db.events[editingEv.id];push(`events/${editingEv.id}`,null);$('evDlg').close();renderCal();renderEv()}
+};
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t)}
+  catch(e){const a=document.createElement('textarea');a.value=t;document.body.append(a);a.select();document.execCommand('copy');a.remove()}
+}
+$('eCopy').onclick=async()=>{
+  const s=$('eStart').value,e=$('eEnd').value,h=$('eH').value;
+  const when=(e&&e>s?`${s} ~ ${e}`:s)+(h?` ${h}:${$('eM').value}`:'');
+  await copyText(`${when} ${$('eText').value.trim()}`);
+  $('eCopy').textContent='✓ 복사됨';
+};
+$('eDup').onclick=()=>{
+  $('evDlg').close();
+  openEv(editingEv,{owner:$('eOwner').value,text:$('eText').value,date:$('eStart').value,end:$('eEnd').value,
+    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value});
 };
 
 /* ---------- 메모 ---------- */
@@ -287,7 +385,9 @@ $('gear').onclick=()=>{
 };
 $('sSave').onclick=()=>{
   db.people.forEach(p=>{p.name=document.querySelector(`[data-n="${p.id}"]`).value.trim()||p.name;p.color=document.querySelector(`[data-k="${p.id}"]`).value});
-  cfg={url:$('sUrl').value.trim(),code:$('sCode').value.trim(),me:$('sMe').value};
+  let u=$('sUrl').value.trim().replace(/\s+/g,'').replace(/\/+$/,'');
+  if(u&&!/^https?:\/\//i.test(u))u='https://'+u;
+  cfg={url:u.replace(/^HTTPS?:/,m=>m.toLowerCase()),code:$('sCode').value.trim(),me:$('sMe').value};
   ls.set('fam-cfg',cfg);saveLocal();
   if(base())push('people',db.people);
   $('set').close();setStatus('ok');renderAll();pull();
@@ -307,7 +407,7 @@ $('file').onchange=async e=>{
   e.target.value='';
 };
 
-function renderAll(){renderChips();fillOwner($('evOwner'),$('evOwner').value||cfg.me);renderCal();renderEv();renderMemos()}
+function renderAll(){renderCal();renderEv();renderMemos()}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setStatus('ok');renderAll();pull();
 </script>
