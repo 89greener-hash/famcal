@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>우리 가족 일정</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3b82f6">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="가족일정">
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--text:#1c1e21;--sub:#6b7280;--line:#e5e7eb;--accent:#3b82f6;--accent-bg:#e8f0fe;--danger:#ef4444;--today:#fde68a}
 @media (prefers-color-scheme:dark){:root{--bg:#15171a;--card:#202327;--text:#e8eaed;--sub:#9aa0a6;--line:#33373d;--accent:#6ea8fe;--accent-bg:#27324a;--danger:#f87171;--today:#5b4a12}}
@@ -302,6 +308,7 @@ $('file').onchange=async e=>{
 };
 
 function renderAll(){renderChips();fillOwner($('evOwner'),$('evOwner').value||cfg.me);renderCal();renderEv();renderMemos()}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setStatus('ok');renderAll();pull();
 </script>
 </body>
