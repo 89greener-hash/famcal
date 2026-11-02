@@ -72,6 +72,15 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
 .pd.e{border-radius:0 10px 10px 0}
 .pd.solo{border-radius:10px}
 .sum{font-size:14px;color:var(--accent);margin:6px 0 0;min-height:21px}
+.ttl{width:100%;font-size:20px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:none;padding:8px 2px;margin-bottom:4px}
+.ttl:focus{outline:none;border-color:var(--accent)}
+.fr{display:flex;gap:12px;align-items:flex-start;margin-top:14px}
+.fr .ic{width:24px;text-align:center;font-size:18px;padding-top:7px;flex:none}
+.fr .bd{flex:1;min-width:0}
+.fr label{margin-top:8px}
+.dateBtn{width:100%;text-align:left;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit;cursor:pointer}
+.hint{font-size:12px;color:var(--sub);margin-top:4px}
+.item .note{color:var(--sub);font-size:13px;white-space:pre-wrap}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -114,49 +123,64 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
 </div>
 
 <dialog id="evDlg">
-  <b id="evTitle">일정</b>
-  <label>누구 일정 (여러 명 선택 가능)</label>
-  <div class="chips" id="eOwners"></div>
-  <label>내용</label>
-  <input id="eText" placeholder="일정 내용">
-  <label>날짜 (시작일을 누르고, 기간이면 끝나는 날을 누르세요)</label>
-  <div id="rp"></div>
-  <div class="sum" id="rpSum"></div>
-  <label>시간 (시를 "종일"로 두면 시간 없음)</label>
-  <div class="row"><select id="eH"></select><span>시</span><select id="eM"></select><span>분</span></div>
-  <label>반복</label>
-  <select id="eRep">
-    <option value="">반복 안 함</option>
-    <option value="daily">매일</option>
-    <option value="weekly">매주</option>
-    <option value="monthly">매월</option>
-    <option value="yearly">매년</option>
-  </select>
-  <div id="eUntilBox" hidden>
-    <label>반복 끝나는 날 (비워두면 계속 반복)</label>
-    <input type="date" id="eUntil">
+  <div class="row" style="margin-bottom:6px">
+    <button class="ghost" id="eCancel" aria-label="닫기">✕</button>
+    <b id="evTitle" style="flex:1;text-align:center">일정 추가</b>
+    <button class="pri" id="eSave">저장</button>
   </div>
-  <label>알림 (시간을 안 정한 일정은 오전 9시 기준)</label>
-  <select id="eRemind">
-    <option value="">알림 없음</option>
-    <option value="0">정시</option>
-    <option value="10">10분 전</option>
-    <option value="30">30분 전</option>
-    <option value="60">1시간 전</option>
-    <option value="1440">하루 전</option>
-  </select>
-  <div id="eNotifyBox" hidden>
-    <label>알림 받을 사람 (그 사람 폰에서 알림을 켜 둬야 해요)</label>
-    <div class="chips" id="eNotify"></div>
-  </div>
-  <label class="chk"><input type="checkbox" id="ePriv"> 🔒 나만 보기 (이 폰에만 저장, 상대방·위젯에는 안 보여요)</label>
+  <input class="ttl" id="eText" placeholder="일정 제목" autocomplete="off">
+
+  <div class="fr"><span class="ic">🕒</span><div class="bd">
+    <button type="button" class="dateBtn" id="eDate"></button>
+    <div id="rpWrap" hidden><div id="rp"></div><div class="sum" id="rpSum"></div></div>
+    <label class="chk" style="margin:10px 0 0"><input type="checkbox" id="eAll"> 하루 종일</label>
+    <div class="row" id="eTimeBox" style="margin-top:8px" hidden><select id="eH"></select><span>시</span><select id="eM"></select><span>분</span></div>
+  </div></div>
+
+  <div class="fr"><span class="ic">👥</span><div class="bd"><div class="chips" id="eOwners"></div></div></div>
+
+  <div class="fr"><span class="ic">🔁</span><div class="bd">
+    <select id="eRep">
+      <option value="">반복 안 함</option>
+      <option value="daily">매일</option>
+      <option value="weekly">매주</option>
+      <option value="monthly">매월</option>
+      <option value="yearly">매년</option>
+    </select>
+    <div id="eUntilBox" hidden>
+      <label>반복 끝나는 날 (비워두면 계속 반복)</label>
+      <input type="date" id="eUntil">
+    </div>
+  </div></div>
+
+  <div class="fr"><span class="ic">🔔</span><div class="bd">
+    <select id="eRemind">
+      <option value="">알림 없음</option>
+      <option value="0">정시</option>
+      <option value="10">10분 전</option>
+      <option value="30">30분 전</option>
+      <option value="60">1시간 전</option>
+      <option value="1440">하루 전</option>
+    </select>
+    <div class="hint">하루 종일 일정은 오전 9시 기준이에요</div>
+    <div id="eNotifyBox" hidden>
+      <label>알림 받을 사람 (그 사람 폰에서 알림을 켜 둬야 해요)</label>
+      <div class="chips" id="eNotify"></div>
+    </div>
+  </div></div>
+
+  <div class="fr"><span class="ic">🔒</span><div class="bd">
+    <label class="chk" style="margin:6px 0 0"><input type="checkbox" id="ePriv"> 나만 보기 (이 폰에만 저장, 상대방·위젯에는 안 보여요)</label>
+  </div></div>
+
+  <div class="fr"><span class="ic">☰</span><div class="bd">
+    <textarea id="eNote" placeholder="설명 추가" style="min-height:70px"></textarea>
+  </div></div>
+
   <div class="row" style="margin-top:14px;flex-wrap:wrap">
     <button class="ghost" id="eDel" style="color:var(--danger)">삭제</button>
     <button class="ghost" id="eCopy">📋 복사</button>
     <button class="ghost" id="eDup">복제</button>
-    <span style="flex:1"></span>
-    <button class="ghost" id="eCancel">닫기</button>
-    <button class="pri" id="eSave">저장</button>
   </div>
 </dialog>
 
@@ -389,7 +413,7 @@ function renderEv(){
       <i class="bar" style="background:${barOf(e)}"></i>
       <input type="checkbox" data-c="${e.id}" ${isDone(e,sel)?'checked':''}>
       <span class="t">${e.time||'종일'}</span>
-      <span class="x" data-e="${e.id}">${e.priv?'🔒 ':''}${esc(e.text)} <small>· ${ownersOf(e).map(o=>esc(person(o).name)).join('·')}${range}${rep}</small></span>
+      <span class="x" data-e="${e.id}">${e.priv?'🔒 ':''}${esc(e.text)} <small>· ${ownersOf(e).map(o=>esc(person(o).name)).join('·')}${range}${rep}</small>${e.note?`<div class="note">${esc(e.note)}</div>`:''}</span>
     </div>`}).join(''):(hn?'':'<div class="empty">일정이 없어요</div>'));
   $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{
     const e=findEv(c.dataset.c);
@@ -440,11 +464,29 @@ function renderPicker(){
     renderPicker();
   });
   $('rpSum').textContent=!rpS?'':rpE?`${md(rpS)} ~ ${md(rpE)} (${nights(rpS,rpE)})`:`${md(rpS)} 하루 일정 · 끝나는 날을 누르면 기간이 돼요`;
+  $('eDate').textContent=(rpS?dLabel(rpS)+(rpE?` ~ ${dLabel(rpE)} · ${nights(rpS,rpE)}`:''):'날짜 고르기')+'  ▾';
 }
+const WD=['일','월','화','수','목','금','토'];
+const dLabel=s=>`${s.slice(0,4)}. ${monOf(s)}. ${dayOf(s)}.(${WD[dowOf(s)]})`;
+$('eDate').onclick=()=>{$('rpWrap').hidden=!$('rpWrap').hidden};
 
 /* ---------- 일정 입력창 ---------- */
-$('eH').innerHTML='<option value="">종일</option>'+Array.from({length:24},(_,i)=>`<option value="${pad(i)}">${pad(i)}</option>`).join('');
+$('eH').innerHTML=Array.from({length:24},(_,i)=>`<option value="${pad(i)}">${pad(i)}</option>`).join('');
 $('eM').innerHTML=Array.from({length:12},(_,i)=>`<option value="${pad(i*5)}">${pad(i*5)}</option>`).join('');
+// 하루 종일을 끄면 시간이 켜지고, 기본값은 다음 정시
+const nextHour=()=>pad(Math.min(23,new Date().getHours()+1));
+function setTime(t){
+  if(t){
+    const [h,mi]=t.split(':');
+    $('eAll').checked=false;$('eH').value=h;
+    $('eM').value=String(Math.round((+mi||0)/5)*5%60).padStart(2,'0');
+  }else{
+    $('eAll').checked=true;$('eH').value=nextHour();$('eM').value='00';
+  }
+  $('eTimeBox').hidden=$('eAll').checked;
+}
+const evTime=()=>$('eAll').checked?'':`${$('eH').value}:${$('eM').value}`;
+$('eAll').onchange=()=>{$('eTimeBox').hidden=$('eAll').checked};
 $('eRep').onchange=()=>{$('eUntilBox').hidden=!$('eRep').value};
 
 let evOwners=new Set();
@@ -498,9 +540,9 @@ function openEv(ev,draft){
   rpV=new Date(rpS.slice(0,7)+'-01T00:00');
   rpFresh=true;
   renderPicker();
-  const [h,mi]=(src&&src.time?src.time:':').split(':');
-  $('eH').value=h||'';
-  $('eM').value=h?String(Math.round((+mi||0)/5)*5%60).padStart(2,'0'):'00';
+  $('rpWrap').hidden=true;   // 날짜 달력은 접어 두고, 날짜 줄을 누르면 펼친다
+  setTime(src&&src.time);
+  $('eNote').value=src&&src.note||'';
   $('eRep').value=src&&src.repeat||'';
   $('eUntil').value=src&&src.until||'';
   $('eUntilBox').hidden=!$('eRep').value;
@@ -512,6 +554,8 @@ function openEv(ev,draft){
   $('eDel').hidden=isNew;$('eDup').hidden=isNew;
   $('eCopy').textContent='📋 복사';
   $('evDlg').showModal();
+  $('evDlg').scrollTop=0;
+  if(isNew&&!draft)$('eText').focus();   // 새 일정은 바로 제목부터 입력
 }
 $('newEv').onclick=()=>openEv(null);
 $('eCancel').onclick=()=>$('evDlg').close();
@@ -521,9 +565,11 @@ $('eSave').onclick=()=>{
   if(!rpS){alert('날짜를 골라 주세요');return}
   const ev=Object.assign(editingEv,{
     owner:[...evOwners][0],owners:[...evOwners],text,date:rpS,end:rpE,
-    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',
+    time:evTime(),
     repeat:$('eRep').value,until:$('eRep').value?$('eUntil').value:''
   });
+  const note=$('eNote').value.trim();
+  if(note)ev.note=note;else delete ev.note;
   if(!ev.repeat)delete ev.doneOn;
   const rem=$('ePriv').checked?'':$('eRemind').value;
   if(rem!==''){ev.remind=rem;ev.notifyTo=[...evNotify]}else{delete ev.remind;delete ev.notifyTo}
@@ -541,15 +587,15 @@ async function copyText(t){
   catch(e){const a=document.createElement('textarea');a.value=t;document.body.append(a);a.select();document.execCommand('copy');a.remove()}
 }
 $('eCopy').onclick=async()=>{
-  const h=$('eH').value;
-  const when=(rpE?`${rpS} ~ ${rpE}`:rpS)+(h?` ${h}:${$('eM').value}`:'');
+  const t=evTime();
+  const when=(rpE?`${rpS} ~ ${rpE}`:rpS)+(t?` ${t}`:'');
   await copyText(`${when} ${$('eText').value.trim()}`);
   $('eCopy').textContent='✓ 복사됨';
 };
 $('eDup').onclick=()=>{
   $('evDlg').close();
   openEv(editingEv,{owners:[...evOwners],text:$('eText').value,date:rpS,end:rpE,priv:$('ePriv').checked,
-    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value,remind:$('eRemind').value,notifyTo:[...evNotify]});
+    time:evTime(),note:$('eNote').value,repeat:$('eRep').value,until:$('eUntil').value,remind:$('eRemind').value,notifyTo:[...evNotify]});
 };
 
 /* ---------- 메모 ---------- */
