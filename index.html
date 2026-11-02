@@ -33,11 +33,12 @@ button.ghost:hover{color:var(--text)}
 .nav b{font-size:18px}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
 .dow{color:var(--sub);font-size:13px;padding:4px 0}
+#calCard{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .day{aspect-ratio:1;border-radius:8px;border:1px solid transparent;background:none;color:var(--text);font:inherit;cursor:pointer;position:relative}
 .day:hover{background:var(--accent-bg)}
 .day.today{background:var(--today)}
 .day.sel{border-color:var(--accent);background:var(--accent-bg)}
-.day.sun{color:var(--danger)}
+.day.sun,.day.hol{color:var(--danger)}
 .dots{position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:2px}
 .dots i{width:6px;height:6px;border-radius:50%}
 .item{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:4px}
@@ -49,15 +50,28 @@ button.ghost:hover{color:var(--text)}
 .item .x{flex:1;cursor:pointer}
 .item small{color:var(--sub)}
 .item.done .x{text-decoration:line-through;color:var(--sub)}
+.item.hday .x{cursor:default;color:var(--danger)}
 .memo{cursor:pointer;border-left:6px solid}
 .memo h3{margin:0 0 4px;font-size:16px}
 .memo p{margin:0;color:var(--sub);white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 .memo small{color:var(--sub)}
 .empty{color:var(--sub);text-align:center;padding:20px 0}
-dialog{width:min(560px,92vw);border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);padding:16px}
+dialog{width:min(560px,92vw);max-height:92vh;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--text);padding:16px}
 dialog::backdrop{background:#0006}
 label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
+label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 0 0;cursor:pointer}
 .status{font-size:12px;color:var(--sub);white-space:nowrap}
+/* 기간 고르는 달력 */
+.pg{gap:2px 0}
+.pd{aspect-ratio:1;border:0;background:none;color:var(--text);font:inherit;font-size:14px;line-height:1.1;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.pd small{font-size:9px;line-height:1;margin-top:1px;min-height:9px}
+.pd.hol,.pd.sun{color:var(--danger)}
+.pd.in{background:var(--accent-bg)}
+.pd.s,.pd.e{background:var(--accent);color:#fff}
+.pd.s{border-radius:10px 0 0 10px}
+.pd.e{border-radius:0 10px 10px 0}
+.pd.solo{border-radius:10px}
+.sum{font-size:14px;color:var(--accent);margin:6px 0 0;min-height:21px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -73,7 +87,7 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
   </div>
 
   <section id="vS">
-    <div class="card">
+    <div class="card" id="calCard">
       <div class="nav">
         <button class="ghost" id="prev">◀</button>
         <b id="title"></b>
@@ -105,8 +119,9 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
   <div class="chips" id="eOwners"></div>
   <label>내용</label>
   <input id="eText" placeholder="일정 내용">
-  <label>날짜 (기간이면 시작 ~ 끝)</label>
-  <div class="row"><input type="date" id="eStart"><span>~</span><input type="date" id="eEnd"></div>
+  <label>날짜 (시작일을 누르고, 기간이면 끝나는 날을 누르세요)</label>
+  <div id="rp"></div>
+  <div class="sum" id="rpSum"></div>
   <label>시간 (시를 "종일"로 두면 시간 없음)</label>
   <div class="row"><select id="eH"></select><span>시</span><select id="eM"></select><span>분</span></div>
   <label>반복</label>
@@ -121,6 +136,7 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
     <label>반복 끝나는 날 (비워두면 계속 반복)</label>
     <input type="date" id="eUntil">
   </div>
+  <label class="chk"><input type="checkbox" id="ePriv"> 🔒 나만 보기 (이 폰에만 저장, 상대방·위젯에는 안 보여요)</label>
   <div class="row" style="margin-top:14px;flex-wrap:wrap">
     <button class="ghost" id="eDel" style="color:var(--danger)">삭제</button>
     <button class="ghost" id="eCopy">📋 복사</button>
@@ -135,6 +151,7 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
   <select id="mOwner" style="margin-bottom:8px"></select>
   <input id="mTitle" placeholder="제목" style="margin-bottom:8px">
   <textarea id="mBody" placeholder="내용"></textarea>
+  <label class="chk"><input type="checkbox" id="mPriv"> 🔒 나만 보기 (이 폰에만 저장, 상대방에게는 안 보여요)</label>
   <div class="row" style="margin-top:10px">
     <button class="ghost" id="mPin"></button>
     <button class="ghost" id="mDel" style="color:var(--danger)">삭제</button>
@@ -161,6 +178,7 @@ label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
     <span style="flex:1"></span>
     <button class="pri" id="sSave">저장</button>
   </div>
+  <div class="status" style="margin-top:8px;white-space:normal">🔒 나만 보기 항목은 이 폰에만 있어요. 폰을 바꾸기 전에 "백업 저장"을 해 두세요.</div>
 </dialog>
 
 <script>
@@ -173,6 +191,7 @@ const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){re
 
 const DEFAULT_PEOPLE=[{id:'a',name:'아빠',color:'#3b82f6'},{id:'b',name:'엄마',color:'#ec4899'},{id:'c',name:'아이',color:'#f59e0b'}];
 let db=Object.assign({people:DEFAULT_PEOPLE,events:{},memos:{}},ls.get('fam-db',{}));
+let priv=Object.assign({events:{},memos:{}},ls.get('fam-priv',{}));   // 나만 보기: 이 폰에만 저장, 서버로 안 보냄
 let cfg=Object.assign({url:'',code:'',me:'a'},ls.get('fam-cfg',{}));
 let view=new Date(); view.setDate(1);
 let sel=key(new Date());
@@ -180,11 +199,17 @@ let editing=null, editingEv=null, inflight=0;
 
 const person=id=>db.people.find(p=>p.id===id)||db.people[0];
 const arr=o=>Object.values(o||{});
+const savePriv=()=>ls.set('fam-priv',priv);
+const allEvents=()=>arr(db.events).concat(arr(priv.events));
+const allMemos=()=>arr(db.memos).concat(arr(priv.memos));
+const findEv=id=>db.events[id]||priv.events[id];
+const findMemo=id=>db.memos[id]||priv.memos[id];
 
 /* ---------- 날짜 계산 / 반복 ---------- */
 const dn=s=>{const[y,m,d]=s.split('-');return Date.UTC(+y,m-1,+d)/864e5};
 const ds=n=>{const t=new Date(n*864e5);return `${t.getUTCFullYear()}-${pad(t.getUTCMonth()+1)}-${pad(t.getUTCDate())}`};
 const dayOf=s=>+s.split('-')[2], monOf=s=>+s.split('-')[1];
+const dowOf=s=>new Date(dn(s)*864e5).getUTCDay();
 
 // ev가 날짜 d(YYYY-MM-DD)에 걸쳐 있는지
 function occurs(ev,d){
@@ -208,9 +233,63 @@ function occurs(ev,d){
 const ownersOf=e=>e.owners&&e.owners.length?e.owners:[e.owner];
 const barOf=e=>{const c=ownersOf(e).map(o=>person(o).color);return c.length>1?`linear-gradient(${c.map((x,i)=>`${x} ${i*100/c.length}% ${(i+1)*100/c.length}%`).join(',')})`:c[0]};
 const isDone=(ev,d)=>ev.repeat?!!(ev.doneOn&&ev.doneOn[d]):!!ev.done;
-const eventsOn=d=>arr(db.events).filter(e=>occurs(e,d)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
+const eventsOn=d=>allEvents().filter(e=>occurs(e,d)).sort((a,b)=>(a.time||'00:00').localeCompare(b.time||'00:00'));
 const REP={daily:'매일',weekly:'매주',monthly:'매월',yearly:'매년'};
 const md=s=>`${monOf(s)}/${dayOf(s)}`;
+const nights=(s,e)=>{const n=dn(e)-dn(s);return n===0?'당일':`${n}박 ${n+1}일`};
+
+/* ---------- 대한민국 공휴일 (음력은 브라우저 내장 한국 달력으로 계산, 대체공휴일 포함) ---------- */
+// 선거일·임시공휴일처럼 규칙으로 알 수 없는 날은 여기에 추가
+const HOL_EXTRA={
+  '2022-03-09':'제20대 대통령선거일','2022-06-01':'제8회 전국동시지방선거일',
+  '2024-04-10':'제22대 국회의원선거일','2024-10-01':'임시공휴일(국군의날)',
+  '2025-01-27':'임시공휴일','2025-06-03':'제21대 대통령선거일',
+  '2026-06-03':'제9회 전국동시지방선거일'
+};
+const holCache={};
+let lunarFmt=null;
+try{lunarFmt=new Intl.DateTimeFormat('en-US-u-ca-dangi',{month:'numeric',day:'numeric'})}catch(e){}
+function lunarOf(n){
+  const p=lunarFmt.formatToParts(new Date(n*864e5+432e5));
+  const mo=p.find(x=>x.type==='month').value;
+  return {m:/^\d+$/.test(mo)?+mo:0,d:+p.find(x=>x.type==='day').value}; // 윤달은 m=0
+}
+function holidaysOf(y){
+  if(holCache[y])return holCache[y];
+  const base={};
+  const put=(date,name,kind)=>(base[date]=base[date]||[]).push({name,kind});
+  [[1,1,'신정','n'],[3,1,'삼일절','a'],[5,5,'어린이날','k'],[6,6,'현충일','n'],[8,15,'광복절','a'],
+   [10,3,'개천절','a'],[10,9,'한글날','a'],[12,25,'성탄절','x']]
+    .forEach(([m,d,n,k])=>put(`${y}-${pad(m)}-${pad(d)}`,n,k));
+  if(lunarFmt){
+    for(let n=Date.UTC(y,0,1)/864e5;n<=Date.UTC(y,11,31)/864e5;n++){
+      const l=lunarOf(n);
+      if(l.m===1&&l.d===1){put(ds(n-1),'설날 연휴','s');put(ds(n),'설날','s');put(ds(n+1),'설날 연휴','s')}
+      if(l.m===8&&l.d===15){put(ds(n-1),'추석 연휴','s');put(ds(n),'추석','s');put(ds(n+1),'추석 연휴','s')}
+      if(l.m===4&&l.d===8)put(ds(n),'부처님오신날','b');
+    }
+  }
+  Object.keys(HOL_EXTRA).filter(k=>k.startsWith(y+'-')).forEach(k=>put(k,HOL_EXTRA[k],'e'));
+  const out={};
+  Object.keys(base).forEach(d=>out[d]=[...new Set(base[d].map(i=>i.name))].join('·'));
+  // 대체공휴일: 같은 날 두 공휴일이 겹쳐도 하루만, 다음 첫 비공휴일(일요일 제외)로
+  const used=new Set();
+  Object.keys(base).sort().forEach(d=>{
+    const items=base[d],dow=dowOf(d),overlap=items.length>1;
+    const hit=items.find(i=>
+      (i.kind==='k'&&y>=2014&&(dow===0||dow===6||overlap))||
+      (i.kind==='s'&&y>=2014&&(dow===0||overlap))||
+      (i.kind==='a'&&y>=2021&&(dow===0||dow===6||overlap))||
+      ((i.kind==='b'||i.kind==='x')&&y>=2023&&(dow===0||dow===6||overlap)));
+    if(!hit)return;
+    let n=dn(d)+1;
+    while(new Date(n*864e5).getUTCDay()===0||base[ds(n)]||used.has(ds(n)))n++;
+    used.add(ds(n));
+    out[ds(n)]=`대체공휴일(${hit.name.replace(' 연휴','')})`;
+  });
+  return holCache[y]=out;
+}
+const holidayName=d=>holidaysOf(+d.slice(0,4))[d]||'';
 
 /* ---------- 저장 / 동기화 ---------- */
 const base=()=>cfg.url&&cfg.code?`${cfg.url.replace(/\/+$/,'')}/rooms/${encodeURIComponent(cfg.code)}`:'';
@@ -241,6 +320,22 @@ function setStatus(s){
 setInterval(pull,5000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
 
+// 공유(서버) ↔ 나만 보기(이 폰) 저장 위치를 priv 값에 따라 옮겨 준다
+function storeItem(kind,item){
+  const shared=db[kind],mine=priv[kind];
+  if(item.priv){
+    if(shared[item.id]){delete shared[item.id];push(`${kind}/${item.id}`,null)}
+    mine[item.id]=item;savePriv();
+  }else{
+    if(mine[item.id]){delete mine[item.id];savePriv()}
+    shared[item.id]=item;push(`${kind}/${item.id}`,item);
+  }
+}
+function removeItem(kind,id){
+  if(db[kind][id]){delete db[kind][id];push(`${kind}/${id}`,null)}
+  if(priv[kind][id]){delete priv[kind][id];savePriv()}
+}
+
 /* ---------- 공통 UI ---------- */
 function fillOwner(sel,val){
   sel.innerHTML=db.people.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -259,7 +354,7 @@ function renderCal(){
   for(let d=1;d<=days;d++){
     const k=`${y}-${pad(m+1)}-${pad(d)}`, dow=(first+d-1)%7;
     const owners=[...new Set(eventsOn(k).flatMap(ownersOf))].slice(0,4);
-    h+=`<button class="day${k===today?' today':''}${k===sel?' sel':''}${dow===0?' sun':''}" data-k="${k}">${d}<span class="dots">${owners.map(o=>`<i style="background:${person(o).color}"></i>`).join('')}</span></button>`;
+    h+=`<button class="day${k===today?' today':''}${k===sel?' sel':''}${dow===0?' sun':''}${holidayName(k)?' hol':''}" data-k="${k}">${d}<span class="dots">${owners.map(o=>`<i style="background:${person(o).color}"></i>`).join('')}</span></button>`;
   }
   $('cal').innerHTML=h;
   $('cal').querySelectorAll('.day').forEach(b=>b.onclick=()=>{sel=b.dataset.k;renderCal();renderEv()});
@@ -267,27 +362,69 @@ function renderCal(){
 function renderEv(){
   const [,m,d]=sel.split('-');
   $('selLabel').textContent=`${+m}월 ${+d}일 일정`;
+  const hn=holidayName(sel);
+  const hrow=hn?`<div class="item hday"><i class="bar" style="background:var(--danger)"></i><span class="t">공휴일</span><span class="x">🎌 ${esc(hn)}</span></div>`:'';
   const list=eventsOn(sel);
-  $('evList').innerHTML=list.length?list.map(e=>{
-    const range=e.end&&e.end>e.date?` · ${md(e.date)}~${md(e.end)}`:'';
+  $('evList').innerHTML=hrow+(list.length?list.map(e=>{
+    const range=e.end&&e.end>e.date?` · ${md(e.date)}~${md(e.end)} ${nights(e.date,e.end)}`:'';
     const rep=e.repeat?` · 🔁${REP[e.repeat]}`:'';
     return `
     <div class="item${isDone(e,sel)?' done':''}">
       <i class="bar" style="background:${barOf(e)}"></i>
       <input type="checkbox" data-c="${e.id}" ${isDone(e,sel)?'checked':''}>
       <span class="t">${e.time||'종일'}</span>
-      <span class="x" data-e="${e.id}">${esc(e.text)} <small>· ${ownersOf(e).map(o=>esc(person(o).name)).join('·')}${range}${rep}</small></span>
-    </div>`}).join(''):'<div class="empty">일정이 없어요</div>';
+      <span class="x" data-e="${e.id}">${e.priv?'🔒 ':''}${esc(e.text)} <small>· ${ownersOf(e).map(o=>esc(person(o).name)).join('·')}${range}${rep}</small></span>
+    </div>`}).join(''):(hn?'':'<div class="empty">일정이 없어요</div>'));
   $('evList').querySelectorAll('[data-c]').forEach(c=>c.onchange=()=>{
-    const e=db.events[c.dataset.c];
+    const e=findEv(c.dataset.c);
     if(e.repeat){e.doneOn=e.doneOn||{};c.checked?e.doneOn[sel]=true:delete e.doneOn[sel]}
     else e.done=c.checked;
-    push(`events/${e.id}`,e);renderEv();
+    storeItem('events',e);renderEv();
   });
-  $('evList').querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>openEv(db.events[x.dataset.e]));
+  $('evList').querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>openEv(findEv(x.dataset.e)));
 }
-$('prev').onclick=()=>{view.setMonth(view.getMonth()-1);renderCal()};
-$('next').onclick=()=>{view.setMonth(view.getMonth()+1);renderCal()};
+function shift(n){
+  view.setMonth(view.getMonth()+n);renderCal();
+  try{$('cal').animate([{transform:`translateX(${n*36}px)`,opacity:.25},{transform:'none',opacity:1}],{duration:200,easing:'ease-out'})}catch(e){}
+}
+$('prev').onclick=()=>shift(-1);
+$('next').onclick=()=>shift(1);
+// 손가락으로 좌우로 밀어서 월 넘기기
+(function(){
+  const el=$('calCard');let x0=0,y0=0,on=false;
+  el.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;on=true;x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+  el.addEventListener('touchend',e=>{
+    if(!on)return;on=false;
+    const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;
+    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5)shift(dx<0?1:-1);
+  },{passive:true});
+})();
+
+/* ---------- 기간 고르는 달력 (시작·끝 표시) ---------- */
+let rpS='',rpE='',rpV=new Date(),rpFresh=true;
+function renderPicker(){
+  const y=rpV.getFullYear(),m=rpV.getMonth();
+  const first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
+  let h=`<div class="nav"><button type="button" class="ghost" data-n="-1">◀</button><b>${y}년 ${m+1}월</b><button type="button" class="ghost" data-n="1">▶</button></div><div class="grid pg">`
+    +['일','월','화','수','목','금','토'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<first;i++)h+='<div></div>';
+  for(let d=1;d<=days;d++){
+    const k=`${y}-${pad(m+1)}-${pad(d)}`,dow=(first+d-1)%7;
+    const isS=k===rpS,isE=k===rpE,inR=rpE&&k>rpS&&k<rpE;
+    const cls=['pd',inR?'in':'',isS?'s':'',isE?'e':'',isS&&!rpE?'solo':'',dow===0?'sun':'',holidayName(k)?'hol':''].join(' ');
+    h+=`<button type="button" class="${cls}" data-k="${k}">${d}<small>${isS?'시작':isE?'끝':''}</small></button>`;
+  }
+  $('rp').innerHTML=h+'</div>';
+  $('rp').querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{rpV=new Date(rpV.getFullYear(),rpV.getMonth()+ +b.dataset.n,1);renderPicker()});
+  $('rp').querySelectorAll('.pd').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k;
+    // 창을 연 뒤 첫 번째 터치, 이미 기간을 고른 뒤의 터치, 시작보다 앞의 날은 '새 시작일'
+    if(rpFresh||!rpS||rpE||k<rpS){rpS=k;rpE='';rpFresh=false}
+    else if(k>rpS)rpE=k;                  // 시작 뒤의 날을 누르면 끝
+    renderPicker();
+  });
+  $('rpSum').textContent=!rpS?'':rpE?`${md(rpS)} ~ ${md(rpE)} (${nights(rpS,rpE)})`:`${md(rpS)} 하루 일정 · 끝나는 날을 누르면 기간이 돼요`;
+}
 
 /* ---------- 일정 입력창 ---------- */
 $('eH').innerHTML='<option value="">종일</option>'+Array.from({length:24},(_,i)=>`<option value="${pad(i)}">${pad(i)}</option>`).join('');
@@ -315,14 +452,18 @@ function openEv(ev,draft){
   evOwners=new Set(src?ownersOf(src):[cfg.me]);
   renderOwnerChips();
   $('eText').value=src?src.text:'';
-  $('eStart').value=src?src.date:sel;
-  $('eEnd').value=src&&src.end&&src.end>src.date?src.end:'';
+  rpS=src?src.date:sel;
+  rpE=src&&src.end&&src.end>src.date?src.end:'';
+  rpV=new Date(rpS.slice(0,7)+'-01T00:00');
+  rpFresh=true;
+  renderPicker();
   const [h,mi]=(src&&src.time?src.time:':').split(':');
   $('eH').value=h||'';
   $('eM').value=h?String(Math.round((+mi||0)/5)*5%60).padStart(2,'0'):'00';
   $('eRep').value=src&&src.repeat||'';
   $('eUntil').value=src&&src.until||'';
   $('eUntilBox').hidden=!$('eRep').value;
+  $('ePriv').checked=!!(src&&src.priv);
   $('eDel').hidden=isNew;$('eDup').hidden=isNew;
   $('eCopy').textContent='📋 복사';
   $('evDlg').showModal();
@@ -330,57 +471,58 @@ function openEv(ev,draft){
 $('newEv').onclick=()=>openEv(null);
 $('eCancel').onclick=()=>$('evDlg').close();
 $('eSave').onclick=()=>{
-  const text=$('eText').value.trim(), start=$('eStart').value;
+  const text=$('eText').value.trim();
   if(!text){alert('일정 내용을 입력해 주세요');return}
-  if(!start){alert('날짜를 골라 주세요');return}
-  let end=$('eEnd').value;if(end&&end<=start)end='';
+  if(!rpS){alert('날짜를 골라 주세요');return}
   const ev=Object.assign(editingEv,{
-    owner:[...evOwners][0],owners:[...evOwners],text,date:start,end,
+    owner:[...evOwners][0],owners:[...evOwners],text,date:rpS,end:rpE,
     time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',
     repeat:$('eRep').value,until:$('eRep').value?$('eUntil').value:''
   });
   if(!ev.repeat)delete ev.doneOn;
-  db.events[ev.id]=ev;push(`events/${ev.id}`,ev);
-  sel=start;view=new Date(start.slice(0,7)+'-01T00:00');
+  if($('ePriv').checked)ev.priv=true;else delete ev.priv;
+  storeItem('events',ev);
+  sel=rpS;view=new Date(rpS.slice(0,7)+'-01T00:00');
   $('evDlg').close();renderCal();renderEv();
 };
 $('eDel').onclick=()=>{
   const msg=editingEv.repeat?'반복 일정 전체가 삭제돼요. 삭제할까요?':'이 일정을 삭제할까요?';
-  if(confirm(msg)){delete db.events[editingEv.id];push(`events/${editingEv.id}`,null);$('evDlg').close();renderCal();renderEv()}
+  if(confirm(msg)){removeItem('events',editingEv.id);$('evDlg').close();renderCal();renderEv()}
 };
 async function copyText(t){
   try{await navigator.clipboard.writeText(t)}
   catch(e){const a=document.createElement('textarea');a.value=t;document.body.append(a);a.select();document.execCommand('copy');a.remove()}
 }
 $('eCopy').onclick=async()=>{
-  const s=$('eStart').value,e=$('eEnd').value,h=$('eH').value;
-  const when=(e&&e>s?`${s} ~ ${e}`:s)+(h?` ${h}:${$('eM').value}`:'');
+  const h=$('eH').value;
+  const when=(rpE?`${rpS} ~ ${rpE}`:rpS)+(h?` ${h}:${$('eM').value}`:'');
   await copyText(`${when} ${$('eText').value.trim()}`);
   $('eCopy').textContent='✓ 복사됨';
 };
 $('eDup').onclick=()=>{
   $('evDlg').close();
-  openEv(editingEv,{owners:[...evOwners],text:$('eText').value,date:$('eStart').value,end:$('eEnd').value,
+  openEv(editingEv,{owners:[...evOwners],text:$('eText').value,date:rpS,end:rpE,priv:$('ePriv').checked,
     time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value});
 };
 
 /* ---------- 메모 ---------- */
 function renderMemos(){
   const q=$('q').value.trim().toLowerCase();
-  const list=arr(db.memos).filter(m=>(m.title+m.body).toLowerCase().includes(q))
+  const list=allMemos().filter(m=>(m.title+m.body).toLowerCase().includes(q))
     .sort((a,b)=>(!!b.pinned-!!a.pinned)||b.updated-a.updated);
   $('memoList').innerHTML=list.length?list.map(m=>`
     <div class="card memo" data-id="${m.id}" style="border-left-color:${person(m.owner).color}">
-      <h3>${m.pinned?'📌 ':''}${esc(m.title||'제목 없음')}</h3>
+      <h3>${m.pinned?'📌 ':''}${m.priv?'🔒 ':''}${esc(m.title||'제목 없음')}</h3>
       <p>${esc(m.body)}</p>
       <small>${esc(person(m.owner).name)} · ${new Date(m.updated).toLocaleString('ko-KR')}</small>
     </div>`).join(''):'<div class="empty">메모가 없어요</div>';
   $('memoList').querySelectorAll('.memo').forEach(c=>c.onclick=()=>openMemo(c.dataset.id));
 }
 function openMemo(id){
-  editing=id?{...db.memos[id]}:{id:uid(),title:'',body:'',pinned:false,owner:cfg.me,isNew:true};
+  editing=id?{...findMemo(id)}:{id:uid(),title:'',body:'',pinned:false,owner:cfg.me,isNew:true};
   fillOwner($('mOwner'),editing.owner);
   $('mTitle').value=editing.title;$('mBody').value=editing.body;
+  $('mPriv').checked=!!editing.priv;
   $('mPin').textContent=editing.pinned?'📌 고정 해제':'📌 고정';
   $('mDel').hidden=!!editing.isNew;
   $('dlg').showModal();
@@ -391,11 +533,15 @@ $('mPin').onclick=()=>{editing.pinned=!editing.pinned;$('mPin').textContent=edit
 $('mCancel').onclick=()=>$('dlg').close();
 $('mSave').onclick=()=>{
   editing.title=$('mTitle').value.trim();editing.body=$('mBody').value;editing.owner=$('mOwner').value;editing.updated=Date.now();
+  if($('mPriv').checked)editing.priv=true;else delete editing.priv;
   const isNew=editing.isNew;delete editing.isNew;
-  if(!isNew||editing.title||editing.body){db.memos[editing.id]=editing;push(`memos/${editing.id}`,editing)}
+  if(!isNew||editing.title||editing.body)storeItem('memos',editing);
   $('dlg').close();renderMemos();
 };
-$('mDel').onclick=()=>{if(confirm('이 메모를 삭제할까요? (공유된 메모는 상대방 폰에서도 사라져요)')){delete db.memos[editing.id];push(`memos/${editing.id}`,null);$('dlg').close();renderMemos()}};
+$('mDel').onclick=()=>{
+  const m=editing.priv?'이 메모를 삭제할까요?':'이 메모를 삭제할까요? (공유된 메모는 상대방 폰에서도 사라져요)';
+  if(confirm(m)){removeItem('memos',editing.id);$('dlg').close();renderMemos()}
+};
 
 /* ---------- 설정 ---------- */
 $('gear').onclick=()=>{
@@ -415,7 +561,7 @@ $('sSave').onclick=()=>{
 };
 $('exp').onclick=()=>{
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({...db,priv},null,2)],{type:'application/json'}));
   a.download=`가족일정_${key(new Date())}.json`;a.click();
 };
 $('imp').onclick=()=>$('file').click();
@@ -423,7 +569,12 @@ $('file').onchange=async e=>{
   try{
     const d=JSON.parse(await e.target.files[0].text());
     if(!d.events||!d.memos||!Array.isArray(d.people))throw 0;
-    if(confirm('현재 데이터를 백업 파일 내용으로 바꿀까요?')){db=d;saveLocal();if(base())fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)});renderAll()}
+    if(confirm('현재 데이터를 백업 파일 내용으로 바꿀까요?')){
+      db={people:d.people,events:d.events,memos:d.memos};saveLocal();
+      if(d.priv){priv={events:d.priv.events||{},memos:d.priv.memos||{}};savePriv()}
+      if(base())fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)});
+      renderAll();
+    }
   }catch(_){alert('올바른 백업 파일이 아니에요')}
   e.target.value='';
 };
@@ -437,6 +588,14 @@ function renderAll(){renderCal();renderEv();renderMemos()}
   cfg={url:q.get('s')||'',code:q.get('c')||'',me:q.get('me')||cfg.me};
   ls.set('fam-cfg',cfg);
   try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+})();
+// 위젯의 ＋ 버튼: #add=날짜 로 열면 그 날짜로 일정 추가 창을 연다
+(function(){
+  const m=location.hash.match(/^#add=(\d{4}-\d{2}-\d{2})/);
+  if(!m)return;
+  sel=m[1];view=new Date(sel.slice(0,7)+'-01T00:00');
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  setTimeout(()=>openEv(null),0);
 })();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setStatus('ok');renderAll();pull();
