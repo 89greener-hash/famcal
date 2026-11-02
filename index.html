@@ -136,6 +136,19 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
     <label>반복 끝나는 날 (비워두면 계속 반복)</label>
     <input type="date" id="eUntil">
   </div>
+  <label>알림 (시간을 안 정한 일정은 오전 9시 기준)</label>
+  <select id="eRemind">
+    <option value="">알림 없음</option>
+    <option value="0">정시</option>
+    <option value="10">10분 전</option>
+    <option value="30">30분 전</option>
+    <option value="60">1시간 전</option>
+    <option value="1440">하루 전</option>
+  </select>
+  <div id="eNotifyBox" hidden>
+    <label>알림 받을 사람 (그 사람 폰에서 알림을 켜 둬야 해요)</label>
+    <div class="chips" id="eNotify"></div>
+  </div>
   <label class="chk"><input type="checkbox" id="ePriv"> 🔒 나만 보기 (이 폰에만 저장, 상대방·위젯에는 안 보여요)</label>
   <div class="row" style="margin-top:14px;flex-wrap:wrap">
     <button class="ghost" id="eDel" style="color:var(--danger)">삭제</button>
@@ -171,6 +184,9 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
   <input id="sUrl" placeholder="https://xxxx-default-rtdb.firebaseio.com" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" inputmode="url">
   <label>가족 코드 (두 폰에 똑같이 입력, 남에게 알려주지 마세요)</label>
   <input id="sCode" placeholder="예: 우리집-7391" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false">
+  <label>푸시 알림 (일정 알림을 이 폰으로 받기)</label>
+  <div class="row"><button class="pri" id="pushBtn" type="button">이 폰에서 알림 켜기</button><button class="ghost" id="pushTest" type="button">테스트</button></div>
+  <div class="status" id="pushMsg" style="white-space:normal;margin-top:6px"></div>
   <div class="row" style="margin-top:14px">
     <button class="ghost" id="exp">백업 저장</button>
     <button class="ghost" id="imp">백업 불러오기</button>
@@ -444,6 +460,31 @@ function renderOwnerChips(){
     renderOwnerChips();
   });
 }
+let evNotify=new Set();
+function renderNotifyChips(){
+  $('eNotify').innerHTML=db.people.map(p=>{
+    const on=evNotify.has(p.id);
+    return `<button type="button" class="chip${on?' on':''}" data-p="${p.id}" style="border-color:${p.color};${on?`background:${p.color}`:''}">${esc(p.name)}</button>`;
+  }).join('');
+  $('eNotify').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.p;
+    if(evNotify.has(id)){if(evNotify.size>1)evNotify.delete(id)}
+    else evNotify.add(id);
+    renderNotifyChips();
+  });
+}
+function syncRemindUI(){
+  $('eNotifyBox').hidden=!$('eRemind').value;
+  if($('eRemind').value)renderNotifyChips();
+}
+$('eRemind').onchange=()=>{if($('eRemind').value&&!evNotify.size)evNotify=new Set([cfg.me]);syncRemindUI()};
+// 나만 보기 일정은 서버에 없어서 알림을 보낼 수 없다
+$('ePriv').onchange=()=>{
+  const p=$('ePriv').checked;
+  $('eRemind').disabled=p;
+  if(p)$('eRemind').value='';
+  syncRemindUI();
+};
 function openEv(ev,draft){
   const src=draft||ev;
   editingEv=ev&&!draft?ev:{id:uid()};
@@ -464,6 +505,10 @@ function openEv(ev,draft){
   $('eUntil').value=src&&src.until||'';
   $('eUntilBox').hidden=!$('eRep').value;
   $('ePriv').checked=!!(src&&src.priv);
+  evNotify=new Set(src&&src.notifyTo&&src.notifyTo.length?src.notifyTo:[cfg.me]);
+  $('eRemind').value=src&&src.remind!==undefined&&src.remind!==null&&src.remind!==''?String(src.remind):'';
+  $('eRemind').disabled=$('ePriv').checked;
+  syncRemindUI();
   $('eDel').hidden=isNew;$('eDup').hidden=isNew;
   $('eCopy').textContent='📋 복사';
   $('evDlg').showModal();
@@ -480,6 +525,8 @@ $('eSave').onclick=()=>{
     repeat:$('eRep').value,until:$('eRep').value?$('eUntil').value:''
   });
   if(!ev.repeat)delete ev.doneOn;
+  const rem=$('ePriv').checked?'':$('eRemind').value;
+  if(rem!==''){ev.remind=rem;ev.notifyTo=[...evNotify]}else{delete ev.remind;delete ev.notifyTo}
   if($('ePriv').checked)ev.priv=true;else delete ev.priv;
   storeItem('events',ev);
   sel=rpS;view=new Date(rpS.slice(0,7)+'-01T00:00');
@@ -502,7 +549,7 @@ $('eCopy').onclick=async()=>{
 $('eDup').onclick=()=>{
   $('evDlg').close();
   openEv(editingEv,{owners:[...evOwners],text:$('eText').value,date:rpS,end:rpE,priv:$('ePriv').checked,
-    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value});
+    time:$('eH').value?`${$('eH').value}:${$('eM').value}`:'',repeat:$('eRep').value,until:$('eUntil').value,remind:$('eRemind').value,notifyTo:[...evNotify]});
 };
 
 /* ---------- 메모 ---------- */
@@ -543,11 +590,62 @@ $('mDel').onclick=()=>{
   if(confirm(m)){removeItem('memos',editing.id);$('dlg').close();renderMemos()}
 };
 
+/* ---------- 푸시 알림 ---------- */
+// 공개 키라서 코드에 있어도 안전하다. 짝이 되는 비밀 키는 GitHub Secrets에만 둔다.
+const VAPID_PUBLIC='BOpzb2HtGdgwjfwYQtz6IWzzFq8mG3iPhG0FCXDAm9dUI-ASBpprPQdfXFRBM1LUiKiCmG5b_sxwgruR-xmXoG4';
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+const standalone=()=>navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64u=s=>{const b=atob((s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))};
+const subId=sub=>sub.endpoint.slice(-24).replace(/[^A-Za-z0-9_-]/g,'_');
+async function curSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription()}catch(e){return null}}
+async function savePushSub(sub){
+  await fetch(`${base()}/push/${subId(sub)}.json`,{method:'PUT',body:JSON.stringify({person:cfg.me,sub:sub.toJSON(),at:Date.now()})});
+}
+async function renderPushUI(){
+  const btn=$('pushBtn'),msg=$('pushMsg');
+  if(!pushOk()||(isIOS&&!standalone())){
+    btn.disabled=true;
+    msg.textContent=isIOS&&!standalone()?'아이폰은 홈 화면에 추가한 앱에서 열어야 알림을 켤 수 있어요.':'이 브라우저는 푸시 알림을 지원하지 않아요.';
+    return;
+  }
+  const sub=await curSub();
+  btn.disabled=false;
+  btn.textContent=sub?'알림 끄기':'이 폰에서 알림 켜기';
+  msg.textContent=sub?`켜짐 · ${person(cfg.me).name} 폰으로 등록돼 있어요`:(Notification.permission==='denied'?'알림이 차단돼 있어요. 폰 설정에서 이 앱의 알림을 허용해 주세요.':'');
+}
+$('pushBtn').onclick=async()=>{
+  const msg=$('pushMsg');
+  if(!base()){msg.textContent='먼저 서버 주소와 가족 코드를 저장해 주세요.';return}
+  try{
+    const sub=await curSub();
+    if(sub){
+      const id=subId(sub);
+      await sub.unsubscribe();
+      await fetch(`${base()}/push/${id}.json`,{method:'DELETE'});
+    }else{
+      if(await Notification.requestPermission()!=='granted'){msg.textContent='알림이 허용되지 않았어요.';return}
+      const reg=await navigator.serviceWorker.ready;
+      const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
+      await savePushSub(s);
+    }
+  }catch(e){msg.textContent='알림 설정에 실패했어요: '+(e.message||e);return}
+  renderPushUI();
+};
+$('pushTest').onclick=async()=>{
+  try{
+    if(!pushOk()||Notification.permission!=='granted'){$('pushMsg').textContent='먼저 알림을 켜 주세요.';return}
+    const reg=await navigator.serviceWorker.ready;
+    await reg.showNotification('가족 일정',{body:'이 폰에서 알림이 잘 보여요 🔔',icon:'icon-192.png'});
+  }catch(e){$('pushMsg').textContent='테스트에 실패했어요: '+(e.message||e)}
+};
+
 /* ---------- 설정 ---------- */
 $('gear').onclick=()=>{
   fillOwner($('sMe'),cfg.me);
   $('sPeople').innerHTML=db.people.map(p=>`<div class="row" style="margin-bottom:6px"><input data-n="${p.id}" value="${esc(p.name)}"><input type="color" data-k="${p.id}" value="${p.color}"></div>`).join('');
   $('sUrl').value=cfg.url;$('sCode').value=cfg.code;
+  renderPushUI();
   $('set').showModal();
 };
 $('sSave').onclick=()=>{
@@ -556,7 +654,7 @@ $('sSave').onclick=()=>{
   if(u&&!/^https?:\/\//i.test(u))u='https://'+u;
   cfg={url:u.replace(/^HTTPS?:/,m=>m.toLowerCase()),code:$('sCode').value.trim(),me:$('sMe').value};
   ls.set('fam-cfg',cfg);saveLocal();
-  if(base())push('people',db.people);
+  if(base()){push('people',db.people);curSub().then(s=>s&&savePushSub(s)).catch(()=>{})} // 폰 주인이 바뀌면 알림 대상도 갱신
   $('set').close();setStatus('ok');renderAll();pull();
 };
 $('exp').onclick=()=>{
