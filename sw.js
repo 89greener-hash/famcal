@@ -50,9 +50,9 @@ self.addEventListener('push', e => {
     let title = d.title;
     if (d.ct) {   // 암호화된 제목(나만 보기 일정)
       try {
-        const key = await kvGet('titleKey');
+        const key = await kvGet('vaultKey');   // 나만 보기 비밀번호로 만든 열쇠 (이 폰에서 한 번 입력해 둔 것)
         const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(d.iv) }, key, b64d(d.ct));
-        title = '🔔 ' + new TextDecoder().decode(pt);
+        title = '🔔 ' + JSON.parse(new TextDecoder().decode(pt)).t;
       } catch (_) { title = '🔔 나만 보기 일정'; }
     }
     await self.registration.showNotification(title || '가족 일정', {

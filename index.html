@@ -92,6 +92,7 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
       <button id="tabM">📝 메모</button>
     </div>
     <span class="status" id="status"></span>
+    <button class="ghost" id="lockBtn" title="나만 보기 잠금">🔒</button>
     <button class="ghost" id="gear" title="설정">⚙️</button>
   </div>
 
@@ -163,7 +164,7 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
       <option value="1440">하루 전</option>
     </select>
     <div class="hint">하루 종일 일정은 오전 9시 기준이에요</div>
-    <div class="hint" id="ePrivHint" hidden>🔒 나만 보기 일정은 이 폰으로만 알림이 와요. 일정 제목은 서버에 올라가지 않아요.</div>
+    <div class="hint" id="ePrivHint" hidden>🔒 나만 보기 일정은 내 폰으로만 알림이 와요. 알림을 받을 폰(아이폰은 홈 화면 앱)에서 알림을 켜 둬야 해요.</div>
     <div id="eNotifyBox" hidden>
       <label>알림 받을 사람 (그 사람 폰에서 알림을 켜 둬야 해요)</label>
       <div class="chips" id="eNotify"></div>
@@ -171,7 +172,7 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
   </div></div>
 
   <div class="fr"><span class="ic">🔒</span><div class="bd">
-    <label class="chk" style="margin:6px 0 0"><input type="checkbox" id="ePriv"> 나만 보기 (이 폰에만 저장, 상대방·위젯에는 안 보여요)</label>
+    <label class="chk" style="margin:6px 0 0"><input type="checkbox" id="ePriv"> 나만 보기 (비밀번호로 잠가서 보관, 상대방·위젯에는 안 보여요)</label>
   </div></div>
 
   <div class="fr"><span class="ic">☰</span><div class="bd">
@@ -185,11 +186,25 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
   </div>
 </dialog>
 
+<dialog id="vdlg">
+  <b id="vTitle">🔒 나만 보기 비밀번호</b>
+  <div class="hint" id="vDesc" style="margin:6px 0 10px"></div>
+  <input type="password" id="vPin" placeholder="비밀번호" autocomplete="off">
+  <input type="password" id="vPin2" placeholder="비밀번호 한 번 더" autocomplete="off" style="margin-top:8px" hidden>
+  <div class="hint" id="vMsg" style="color:var(--danger);min-height:18px"></div>
+  <div class="row" style="margin-top:12px">
+    <button class="ghost" id="vReset" hidden style="color:var(--danger)">비밀번호를 잊었어요</button>
+    <span style="flex:1"></span>
+    <button class="ghost" id="vCancel">취소</button>
+    <button class="pri" id="vOk">확인</button>
+  </div>
+</dialog>
+
 <dialog id="dlg">
   <select id="mOwner" style="margin-bottom:8px"></select>
   <input id="mTitle" placeholder="제목" style="margin-bottom:8px">
   <textarea id="mBody" placeholder="내용"></textarea>
-  <label class="chk"><input type="checkbox" id="mPriv"> 🔒 나만 보기 (이 폰에만 저장, 상대방에게는 안 보여요)</label>
+  <label class="chk"><input type="checkbox" id="mPriv"> 🔒 나만 보기 (비밀번호로 잠가서 보관, 상대방에게는 안 보여요)</label>
   <div class="row" style="margin-top:10px">
     <button class="ghost" id="mPin"></button>
     <button class="ghost" id="mDel" style="color:var(--danger)">삭제</button>
@@ -352,6 +367,7 @@ async function pull(){
     if(d===null){await fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)})}
     else{db={people:d.people||db.people,events:d.events||{},memos:d.memos||{}};saveLocal()}
     setStatus('ok');renderAll();
+    try{await pullVault()}catch(e){}
   }catch(e){setStatus('err')}
 }
 function setStatus(s){
@@ -361,22 +377,21 @@ function setStatus(s){
 setInterval(pull,5000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
 
-// 공유(서버) ↔ 나만 보기(이 폰) 저장 위치를 priv 값에 따라 옮겨 준다
+// 공유(서버) ↔ 나만 보기(비밀번호로 잠근 보관함) 저장 위치를 priv 값에 따라 옮겨 준다
 function storeItem(kind,item){
   const shared=db[kind],mine=priv[kind];
   if(item.priv){
     if(shared[item.id]){delete shared[item.id];push(`${kind}/${item.id}`,null)}
-    mine[item.id]=item;savePriv();
+    mine[item.id]=item;
+    if(vaultKey)vaultPut(kind,item);else savePriv();   // 보관함이 잠겨 있거나 없으면 이 폰에만
   }else{
-    if(mine[item.id]){delete mine[item.id];savePriv()}
+    if(mine[item.id]){delete mine[item.id];if(vaultKey)vaultDel(kind,item.id);else savePriv()}
     shared[item.id]=item;push(`${kind}/${item.id}`,item);
   }
-  if(kind==='events')syncPrivAlarms();
 }
 function removeItem(kind,id){
   if(db[kind][id]){delete db[kind][id];push(`${kind}/${id}`,null)}
-  if(priv[kind][id]){delete priv[kind][id];savePriv()}
-  if(kind==='events')syncPrivAlarms();
+  if(priv[kind][id]){delete priv[kind][id];if(vaultKey)vaultDel(kind,id);else savePriv()}
 }
 
 /* ---------- 공통 UI ---------- */
@@ -525,7 +540,10 @@ function syncRemindUI(){
   if(on&&!p)renderNotifyChips();
 }
 $('eRemind').onchange=()=>{if($('eRemind').value&&!evNotify.size)evNotify=new Set([cfg.me]);syncRemindUI()};
-$('ePriv').onchange=syncRemindUI;
+$('ePriv').onchange=async()=>{
+  if($('ePriv').checked&&vaultOn()&&!vaultKey&&!await askVault())$('ePriv').checked=false;
+  syncRemindUI();
+};
 function openEv(ev,draft){
   const src=draft||ev;
   editingEv=ev&&!draft?ev:{id:uid()};
@@ -557,10 +575,11 @@ function openEv(ev,draft){
 }
 $('newEv').onclick=()=>openEv(null);
 $('eCancel').onclick=()=>$('evDlg').close();
-$('eSave').onclick=()=>{
+$('eSave').onclick=async()=>{
   const text=$('eText').value.trim();
   if(!text){alert('일정 내용을 입력해 주세요');return}
   if(!rpS){alert('날짜를 골라 주세요');return}
+  if($('ePriv').checked&&vaultOn()&&!vaultKey&&!await askVault())return;
   const ev=Object.assign(editingEv,{
     owner:[...evOwners][0],owners:[...evOwners],text,date:rpS,end:rpE,
     time:evTime(),
@@ -571,7 +590,6 @@ $('eSave').onclick=()=>{
   if(!ev.repeat)delete ev.doneOn;
   const rem=$('eRemind').value,isPriv=$('ePriv').checked;
   if(rem!==''){ev.remind=rem;if(isPriv)delete ev.notifyTo;else ev.notifyTo=[...evNotify]}else{delete ev.remind;delete ev.notifyTo}
-  if(isPriv&&rem!=='')curSub().then(s=>{if(!s)alert('나만 보기 일정 알림은 이 폰의 알림을 켜야 와요.\n⚙️ 설정에서 "이 폰에서 알림 켜기"를 눌러 주세요.')});
   if($('ePriv').checked)ev.priv=true;else delete ev.priv;
   storeItem('events',ev);
   sel=rpS;view=new Date(rpS.slice(0,7)+'-01T00:00');
@@ -623,7 +641,9 @@ $('newMemo').onclick=()=>openMemo();
 $('q').oninput=renderMemos;
 $('mPin').onclick=()=>{editing.pinned=!editing.pinned;$('mPin').textContent=editing.pinned?'📌 고정 해제':'📌 고정'};
 $('mCancel').onclick=()=>$('dlg').close();
-$('mSave').onclick=()=>{
+$('mPriv').onchange=async()=>{if($('mPriv').checked&&vaultOn()&&!vaultKey&&!await askVault())$('mPriv').checked=false};
+$('mSave').onclick=async()=>{
+  if($('mPriv').checked&&vaultOn()&&!vaultKey&&!await askVault())return;
   editing.title=$('mTitle').value.trim();editing.body=$('mBody').value;editing.owner=$('mOwner').value;editing.updated=Date.now();
   if($('mPriv').checked)editing.priv=true;else delete editing.priv;
   const isNew=editing.isNew;delete editing.isNew;
@@ -648,38 +668,156 @@ async function savePushSub(sub){
   await fetch(`${base()}/push/${subId(sub)}.json`,{method:'PUT',body:JSON.stringify({person:cfg.me,sub:sub.toJSON(),at:Date.now()})});
 }
 
-/* 나만 보기 일정 알림: 제목은 이 폰에만 있는 키로 암호화해서 올리고, 서버는 시각만 안다.
-   알림이 도착하면 서비스 워커가 같은 키로 제목을 풀어서 보여 준다. */
+/* ---------- 나만 보기 보관함 ----------
+   일정·메모 내용은 '나만 보기 비밀번호'로 만든 열쇠로 암호화해서 서버에 둔다.
+   비밀번호를 입력한 화면(Safari 탭, 홈 화면 앱, 다른 폰)에서만 풀리고, 서버에는 내용을 읽을 수 없는 암호문만 있다.
+   알림이 걸린 일정은 시각만 따로 올라가서 서버가 제때 알림을 보낼 수 있다. 제목은 암호문으로만 간다. */
 const kvOpen=()=>new Promise((res,rej)=>{const r=indexedDB.open('famcal-kv',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{const d=await kvOpen();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})};
 const kvSet=async(k,v)=>{const d=await kvOpen();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
-async function titleKey(){
-  let k=await kvGet('titleKey');
-  if(!k){k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await kvSet('titleKey',k)}
-  return k;
-}
+const kvDel=async k=>{const d=await kvOpen();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
+const enc8=new TextEncoder(),dec8=new TextDecoder();
 const b64e=u=>btoa(String.fromCharCode(...u));
-async function encTitle(text){
+const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const vaultOn=()=>!!base()&&!!(window.crypto&&crypto.subtle);
+let vaultKey=null,vMeta=null,vResolve=null;
+const vkey=()=>`vaultKey_${cfg.me}`;
+async function deriveKey(pin,saltB64){
+  const km=await crypto.subtle.importKey('raw',enc8.encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:b64d(saltB64),iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encObj(obj,key){
   const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await titleKey(),new TextEncoder().encode(text)));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc8.encode(JSON.stringify(obj))));
   return {iv:b64e(iv),ct:b64e(ct)};
 }
-async function syncPrivAlarms(){
-  if(!base()||!pushOk()||!window.crypto||!crypto.subtle)return;
-  try{
-    const sub=await curSub();
-    if(!sub)return;
-    const dev=subId(sub);
-    const items=Object.values(priv.events).filter(e=>e.remind!==undefined&&e.remind!==null&&e.remind!=='');
-    if(!items.length){await fetch(`${base()}/privAlarms/${dev}.json`,{method:'DELETE'});return}
-    const obj={};
-    for(const e of items){
-      const t=await encTitle(e.text);
-      obj[e.id]={date:e.date,time:e.time||'',repeat:e.repeat||'',until:e.until||'',remind:e.remind,iv:t.iv,ct:t.ct};
-    }
-    await fetch(`${base()}/privAlarms/${dev}.json`,{method:'PUT',body:JSON.stringify(obj)});
-  }catch(e){}
+async function decObj(rec,key){
+  return JSON.parse(dec8.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(rec.iv)},key,b64d(rec.ct))));
 }
+async function fb(method,path,body){
+  const r=await fetch(`${base()}/${path}.json`,{method,body:body===undefined?undefined:JSON.stringify(body)});
+  if(!r.ok)throw new Error(`${method} ${path} ${r.status}`);
+  return method==='GET'?r.json():null;
+}
+function updateLockBtn(){
+  $('lockBtn').textContent=vaultKey?'🔓':'🔒';
+  $('lockBtn').title=vaultKey?'나만 보기 열림 (누르면 잠금)':'나만 보기 잠김 (누르면 비밀번호 입력)';
+}
+async function loadVaultKey(){
+  vaultKey=null;
+  try{vaultKey=(await kvGet(vkey()))||null}catch(e){}
+  updateLockBtn();
+}
+async function saveVaultKey(key){
+  await kvSet(vkey(),key);
+  await kvSet('vaultKey',key);   // 알림이 올 때 서비스 워커가 제목을 풀 때 쓴다
+  vaultKey=key;updateLockBtn();
+}
+async function lockVault(){
+  vaultKey=null;
+  try{await kvDel(vkey());await kvDel('vaultKey')}catch(e){}
+  ls.set('fam-vault-raw',null);
+  priv={events:{},memos:{}};
+  updateLockBtn();renderAll();
+}
+async function vaultPut(kind,item){
+  if(!vaultKey||!base())return;
+  inflight++;
+  try{
+    await fb('PUT',`vault/${cfg.me}/${kind}/${item.id}`,await encObj(item,vaultKey));
+    if(kind==='events'){
+      if(item.remind!==undefined&&item.remind!==null&&item.remind!==''){
+        const t=await encObj({t:item.text},vaultKey);   // 알림 제목은 암호문으로만
+        await fb('PUT',`privAlarms/${cfg.me}/${item.id}`,{date:item.date,time:item.time||'',repeat:item.repeat||'',until:item.until||'',remind:item.remind,iv:t.iv,ct:t.ct});
+      }else await fb('DELETE',`privAlarms/${cfg.me}/${item.id}`);
+    }
+    setStatus('ok');
+  }catch(e){setStatus('err')}
+  finally{inflight--}
+}
+async function vaultDel(kind,id){
+  if(!base())return;
+  inflight++;
+  try{
+    await fb('DELETE',`vault/${cfg.me}/${kind}/${id}`);
+    if(kind==='events')await fb('DELETE',`privAlarms/${cfg.me}/${id}`);
+  }catch(e){setStatus('err')}
+  finally{inflight--}
+}
+async function applyVault(raw){
+  const next={events:{},memos:{}};let ok=0,bad=0;
+  for(const kind of ['events','memos'])for(const [id,rec] of Object.entries(raw[kind]||{})){
+    try{const o=await decObj(rec,vaultKey);o.priv=true;next[kind][id]=o;ok++}catch(e){bad++}
+  }
+  if(bad&&!ok){await lockVault();return}   // 다른 기기에서 비밀번호를 새로 만든 경우: 다시 입력하게 한다
+  priv=next;renderAll();
+}
+async function pullVault(){
+  if(!vaultOn()||!vaultKey)return;
+  const raw=(await fb('GET',`vault/${cfg.me}`))||{};
+  ls.set('fam-vault-raw',{me:cfg.me,raw});   // 암호문만 저장해 두면 인터넷이 없어도 열 수 있다
+  await applyVault(raw);
+}
+// 보관함을 쓰기 전에 이 폰에만 있던 나만 보기 항목을 보관함으로 옮긴다
+async function migrateLocalPriv(){
+  const old=ls.get('fam-priv',null);
+  if(!old)return;
+  for(const kind of ['events','memos'])for(const it of Object.values(old[kind]||{}))await vaultPut(kind,it);
+  ls.set('fam-priv',{events:{},memos:{}});
+}
+function askVault(){
+  return new Promise(async resolve=>{
+    if(!vaultOn()){alert('나만 보기 보관함은 서버 주소와 가족 코드를 설정한 뒤 쓸 수 있어요.');resolve(false);return}
+    try{vMeta=await fb('GET',`vaultMeta/${cfg.me}`)}catch(e){alert('서버에 연결하지 못했어요');resolve(false);return}
+    $('vTitle').textContent=vMeta?'🔒 나만 보기 비밀번호 입력':'🔒 나만 보기 비밀번호 만들기';
+    $('vDesc').textContent=vMeta?`${person(cfg.me).name}의 나만 보기를 여는 비밀번호예요.`
+      :'나만 보기 일정·메모를 암호로 잠가서 서버에 보관해요. 이 비밀번호는 복구할 수 없으니 꼭 기억해 주세요. (4자 이상)';
+    $('vPin2').hidden=!!vMeta;$('vReset').hidden=!vMeta;
+    $('vPin').value='';$('vPin2').value='';$('vMsg').textContent='';
+    vResolve=resolve;
+    $('vdlg').showModal();$('vPin').focus();
+  });
+}
+function finishV(ok){const r=vResolve;vResolve=null;$('vdlg').close();if(r)r(ok)}
+$('vdlg').addEventListener('close',()=>{if(vResolve){const r=vResolve;vResolve=null;r(false)}});
+$('vCancel').onclick=()=>finishV(false);
+$('vOk').onclick=async()=>{
+  const pin=$('vPin').value,msg=$('vMsg');
+  msg.textContent='';
+  if(pin.length<4){msg.textContent='4자 이상 입력해 주세요';return}
+  if(!vMeta&&pin!==$('vPin2').value){msg.textContent='두 번 입력한 비밀번호가 달라요';return}
+  $('vOk').disabled=true;
+  try{
+    let key;
+    if(!vMeta){
+      const salt=b64e(crypto.getRandomValues(new Uint8Array(16)));
+      key=await deriveKey(pin,salt);
+      await fb('PUT',`vaultMeta/${cfg.me}`,{salt,...await encObj({ok:'famcal'},key)});
+    }else{
+      key=await deriveKey(pin,vMeta.salt);
+      try{await decObj(vMeta,key)}catch(e){msg.textContent='비밀번호가 맞지 않아요';return}
+    }
+    await saveVaultKey(key);
+    await migrateLocalPriv();
+    await pullVault();
+    finishV(true);
+  }catch(e){msg.textContent='실패했어요: '+(e.message||e)}
+  finally{$('vOk').disabled=false}
+};
+$('vReset').onclick=async()=>{
+  if(!confirm('비밀번호를 잊었다면 초기화해야 해요.\n서버에 보관된 나만 보기 일정·메모가 모두 삭제돼요. 계속할까요?'))return;
+  try{
+    await fb('DELETE',`vault/${cfg.me}`);await fb('DELETE',`vaultMeta/${cfg.me}`);await fb('DELETE',`privAlarms/${cfg.me}`);
+  }catch(e){$('vMsg').textContent='초기화하지 못했어요';return}
+  await lockVault();
+  finishV(false);
+  alert('초기화했어요. 나만 보기를 다시 쓰려면 새 비밀번호를 만들어 주세요.');
+};
+$('lockBtn').onclick=async()=>{
+  if(!vaultOn()){alert('나만 보기 보관함은 서버 주소와 가족 코드를 설정한 뒤 쓸 수 있어요.');return}
+  if(vaultKey){if(confirm('나만 보기를 잠글까요?\n잠그면 비밀번호를 다시 입력해야 열려요.'))await lockVault()}
+  else if(await askVault())renderAll();
+};
 async function renderPushUI(){
   const btn=$('pushBtn'),msg=$('pushMsg');
   if(!pushOk()||(isIOS&&!standalone())){
@@ -701,13 +839,11 @@ $('pushBtn').onclick=async()=>{
       const id=subId(sub);
       await sub.unsubscribe();
       await fetch(`${base()}/push/${id}.json`,{method:'DELETE'});
-      await fetch(`${base()}/privAlarms/${id}.json`,{method:'DELETE'});
     }else{
       if(await Notification.requestPermission()!=='granted'){msg.textContent='알림이 허용되지 않았어요.';return}
       const reg=await navigator.serviceWorker.ready;
       const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
       await savePushSub(s);
-      syncPrivAlarms();   // 이미 만들어 둔 나만 보기 알림도 이 폰에 연결
     }
   }catch(e){msg.textContent='알림 설정에 실패했어요: '+(e.message||e);return}
   renderPushUI();
@@ -735,7 +871,7 @@ $('sSave').onclick=()=>{
   cfg={url:u.replace(/^HTTPS?:/,m=>m.toLowerCase()),code:$('sCode').value.trim(),me:$('sMe').value};
   ls.set('fam-cfg',cfg);saveLocal();
   if(base()){push('people',db.people);curSub().then(s=>s&&savePushSub(s)).catch(()=>{})} // 폰 주인이 바뀌면 알림 대상도 갱신
-  $('set').close();setStatus('ok');renderAll();pull();
+  $('set').close();setStatus('ok');priv=base()?{events:{},memos:{}}:priv;loadVaultKey().then(()=>{renderAll();pull()});
 };
 $('exp').onclick=()=>{
   const a=document.createElement('a');
@@ -749,7 +885,10 @@ $('file').onchange=async e=>{
     if(!d.events||!d.memos||!Array.isArray(d.people))throw 0;
     if(confirm('현재 데이터를 백업 파일 내용으로 바꿀까요?')){
       db={people:d.people,events:d.events,memos:d.memos};saveLocal();
-      if(d.priv){priv={events:d.priv.events||{},memos:d.priv.memos||{}};savePriv()}
+      if(d.priv){
+        priv={events:d.priv.events||{},memos:d.priv.memos||{}};
+        if(vaultKey){for(const k of ['events','memos'])for(const it of Object.values(priv[k]))vaultPut(k,it)}else savePriv();
+      }
       if(base())fetch(`${base()}.json`,{method:'PUT',body:JSON.stringify(db)});
       renderAll();
     }
@@ -776,8 +915,12 @@ function renderAll(){renderCal();renderEv();renderMemos()}
   setTimeout(()=>openEv(null),0);
 })();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-setStatus('ok');renderAll();pull();
-setTimeout(syncPrivAlarms,4000);
+setStatus('ok');renderAll();
+loadVaultKey().then(()=>{
+  const c=ls.get('fam-vault-raw',null);
+  if(vaultKey&&c&&c.me===cfg.me)applyVault(c.raw);   // 인터넷 없이도 열리게 저장해 둔 암호문부터
+  pull();
+});
 </script>
 </body>
 </html>
