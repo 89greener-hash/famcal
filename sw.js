@@ -1,5 +1,5 @@
 // 앱 껍데기만 캐시한다. 일정·메모 데이터(Firebase)는 건드리지 않는다.
-const CACHE = 'famcal-v2';
+const CACHE = 'famcal-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -29,17 +29,40 @@ self.addEventListener('fetch', e => {
   );
 });
 
+// 나만 보기 일정의 제목은 이 폰에만 있는 키로 풀어서 보여 준다
+const kvGet = k => new Promise((res, rej) => {
+  const r = indexedDB.open('famcal-kv', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('kv');
+  r.onerror = () => rej(r.error);
+  r.onsuccess = () => {
+    const q = r.result.transaction('kv').objectStore('kv').get(k);
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  };
+});
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
 // 푸시 알림 받기
 self.addEventListener('push', e => {
-  let d = {};
-  try { d = e.data.json(); } catch (_) { d = { title: '가족 일정', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || '가족 일정', {
-    body: d.body || '',
-    icon: 'icon-192.png',
-    badge: 'icon-192.png',
-    tag: d.tag,
-    data: { url: d.url || './' }
-  }));
+  e.waitUntil((async () => {
+    let d = {};
+    try { d = e.data.json(); } catch (_) { d = { title: '가족 일정', body: e.data ? e.data.text() : '' }; }
+    let title = d.title;
+    if (d.ct) {   // 암호화된 제목(나만 보기 일정)
+      try {
+        const key = await kvGet('titleKey');
+        const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(d.iv) }, key, b64d(d.ct));
+        title = '🔔 ' + new TextDecoder().decode(pt);
+      } catch (_) { title = '🔔 나만 보기 일정'; }
+    }
+    await self.registration.showNotification(title || '가족 일정', {
+      body: d.body || '',
+      icon: 'icon-192.png',
+      badge: 'icon-192.png',
+      tag: d.tag,
+      data: { url: d.url || './' }
+    });
+  })());
 });
 
 // 알림을 누르면 앱 열기

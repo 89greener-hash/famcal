@@ -163,6 +163,7 @@ label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:12px 
       <option value="1440">하루 전</option>
     </select>
     <div class="hint">하루 종일 일정은 오전 9시 기준이에요</div>
+    <div class="hint" id="ePrivHint" hidden>🔒 나만 보기 일정은 이 폰으로만 알림이 와요. 일정 제목은 서버에 올라가지 않아요.</div>
     <div id="eNotifyBox" hidden>
       <label>알림 받을 사람 (그 사람 폰에서 알림을 켜 둬야 해요)</label>
       <div class="chips" id="eNotify"></div>
@@ -370,10 +371,12 @@ function storeItem(kind,item){
     if(mine[item.id]){delete mine[item.id];savePriv()}
     shared[item.id]=item;push(`${kind}/${item.id}`,item);
   }
+  if(kind==='events')syncPrivAlarms();
 }
 function removeItem(kind,id){
   if(db[kind][id]){delete db[kind][id];push(`${kind}/${id}`,null)}
   if(priv[kind][id]){delete priv[kind][id];savePriv()}
+  if(kind==='events')syncPrivAlarms();
 }
 
 /* ---------- 공통 UI ---------- */
@@ -516,17 +519,13 @@ function renderNotifyChips(){
   });
 }
 function syncRemindUI(){
-  $('eNotifyBox').hidden=!$('eRemind').value;
-  if($('eRemind').value)renderNotifyChips();
+  const on=!!$('eRemind').value,p=$('ePriv').checked;
+  $('eNotifyBox').hidden=!on||p;        // 나만 보기는 받을 사람을 고르지 않는다(이 폰으로만)
+  $('ePrivHint').hidden=!(on&&p);
+  if(on&&!p)renderNotifyChips();
 }
 $('eRemind').onchange=()=>{if($('eRemind').value&&!evNotify.size)evNotify=new Set([cfg.me]);syncRemindUI()};
-// 나만 보기 일정은 서버에 없어서 알림을 보낼 수 없다
-$('ePriv').onchange=()=>{
-  const p=$('ePriv').checked;
-  $('eRemind').disabled=p;
-  if(p)$('eRemind').value='';
-  syncRemindUI();
-};
+$('ePriv').onchange=syncRemindUI;
 function openEv(ev,draft){
   const src=draft||ev;
   editingEv=ev&&!draft?ev:{id:uid()};
@@ -549,7 +548,6 @@ function openEv(ev,draft){
   $('ePriv').checked=!!(src&&src.priv);
   evNotify=new Set(src&&src.notifyTo&&src.notifyTo.length?src.notifyTo:[cfg.me]);
   $('eRemind').value=src&&src.remind!==undefined&&src.remind!==null&&src.remind!==''?String(src.remind):'';
-  $('eRemind').disabled=$('ePriv').checked;
   syncRemindUI();
   $('eDel').hidden=isNew;$('eDup').hidden=isNew;
   $('eCopy').textContent='📋 복사';
@@ -571,8 +569,9 @@ $('eSave').onclick=()=>{
   const note=$('eNote').value.trim();
   if(note)ev.note=note;else delete ev.note;
   if(!ev.repeat)delete ev.doneOn;
-  const rem=$('ePriv').checked?'':$('eRemind').value;
-  if(rem!==''){ev.remind=rem;ev.notifyTo=[...evNotify]}else{delete ev.remind;delete ev.notifyTo}
+  const rem=$('eRemind').value,isPriv=$('ePriv').checked;
+  if(rem!==''){ev.remind=rem;if(isPriv)delete ev.notifyTo;else ev.notifyTo=[...evNotify]}else{delete ev.remind;delete ev.notifyTo}
+  if(isPriv&&rem!=='')curSub().then(s=>{if(!s)alert('나만 보기 일정 알림은 이 폰의 알림을 켜야 와요.\n⚙️ 설정에서 "이 폰에서 알림 켜기"를 눌러 주세요.')});
   if($('ePriv').checked)ev.priv=true;else delete ev.priv;
   storeItem('events',ev);
   sel=rpS;view=new Date(rpS.slice(0,7)+'-01T00:00');
@@ -648,6 +647,39 @@ async function curSub(){try{const reg=await navigator.serviceWorker.ready;return
 async function savePushSub(sub){
   await fetch(`${base()}/push/${subId(sub)}.json`,{method:'PUT',body:JSON.stringify({person:cfg.me,sub:sub.toJSON(),at:Date.now()})});
 }
+
+/* 나만 보기 일정 알림: 제목은 이 폰에만 있는 키로 암호화해서 올리고, 서버는 시각만 안다.
+   알림이 도착하면 서비스 워커가 같은 키로 제목을 풀어서 보여 준다. */
+const kvOpen=()=>new Promise((res,rej)=>{const r=indexedDB.open('famcal-kv',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const kvGet=async k=>{const d=await kvOpen();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})};
+const kvSet=async(k,v)=>{const d=await kvOpen();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})};
+async function titleKey(){
+  let k=await kvGet('titleKey');
+  if(!k){k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await kvSet('titleKey',k)}
+  return k;
+}
+const b64e=u=>btoa(String.fromCharCode(...u));
+async function encTitle(text){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await titleKey(),new TextEncoder().encode(text)));
+  return {iv:b64e(iv),ct:b64e(ct)};
+}
+async function syncPrivAlarms(){
+  if(!base()||!pushOk()||!window.crypto||!crypto.subtle)return;
+  try{
+    const sub=await curSub();
+    if(!sub)return;
+    const dev=subId(sub);
+    const items=Object.values(priv.events).filter(e=>e.remind!==undefined&&e.remind!==null&&e.remind!=='');
+    if(!items.length){await fetch(`${base()}/privAlarms/${dev}.json`,{method:'DELETE'});return}
+    const obj={};
+    for(const e of items){
+      const t=await encTitle(e.text);
+      obj[e.id]={date:e.date,time:e.time||'',repeat:e.repeat||'',until:e.until||'',remind:e.remind,iv:t.iv,ct:t.ct};
+    }
+    await fetch(`${base()}/privAlarms/${dev}.json`,{method:'PUT',body:JSON.stringify(obj)});
+  }catch(e){}
+}
 async function renderPushUI(){
   const btn=$('pushBtn'),msg=$('pushMsg');
   if(!pushOk()||(isIOS&&!standalone())){
@@ -669,11 +701,13 @@ $('pushBtn').onclick=async()=>{
       const id=subId(sub);
       await sub.unsubscribe();
       await fetch(`${base()}/push/${id}.json`,{method:'DELETE'});
+      await fetch(`${base()}/privAlarms/${id}.json`,{method:'DELETE'});
     }else{
       if(await Notification.requestPermission()!=='granted'){msg.textContent='알림이 허용되지 않았어요.';return}
       const reg=await navigator.serviceWorker.ready;
       const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
       await savePushSub(s);
+      syncPrivAlarms();   // 이미 만들어 둔 나만 보기 알림도 이 폰에 연결
     }
   }catch(e){msg.textContent='알림 설정에 실패했어요: '+(e.message||e);return}
   renderPushUI();
@@ -743,6 +777,7 @@ function renderAll(){renderCal();renderEv();renderMemos()}
 })();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 setStatus('ok');renderAll();pull();
+setTimeout(syncPrivAlarms,4000);
 </script>
 </body>
 </html>
